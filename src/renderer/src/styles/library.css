@@ -311,6 +311,41 @@
   box-shadow: inset 0 0 0 2px var(--danger);
 }
 
+/* A game Launchbay sees running: a lit sticker at the top left. */
+.tile__running {
+  position: absolute;
+  top: clamp(5px, 4cqw, 8px);
+  left: clamp(5px, 4cqw, 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  pointer-events: none;
+}
+
+.tile__running .spec {
+  font-size: var(--text-micro);
+  font-weight: 750;
+}
+
+.tile__running-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-ink);
+  animation: running-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes running-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .tile__error {
   position: absolute;
   top: 8px;
@@ -485,7 +520,7 @@
 /* ------------------------------------------------------------- list table */
 
 .library-scroll--list {
-  --cols: 36px minmax(160px, 1fr) 120px 92px 96px 124px 104px 32px;
+  --cols: 36px minmax(160px, 1fr) 120px 124px 96px 124px 104px 32px;
 }
 
 .list-head,
@@ -593,6 +628,25 @@
   text-overflow: ellipsis;
 }
 
+.row__tag--running {
+  background: var(--accent);
+  box-shadow: none;
+  color: var(--accent-ink);
+}
+
+.row__num--tracked {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.row__source {
+  color: var(--ink-2);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
 .row__tag {
   flex: none;
   padding: 3px 6px;
@@ -668,7 +722,7 @@
 /* Narrower: one date column fits. It is Added while sorting by it, else Last played. */
 @media (max-width: 1180px) {
   .library-scroll--list {
-    --cols: 36px minmax(150px, 1fr) 112px 88px 92px 116px 32px;
+    --cols: 36px minmax(150px, 1fr) 112px 124px 92px 116px 32px;
   }
   .library-scroll--list:not(.is-sorted-by-added) :is(.list-head > :nth-child(7), .row__added),
   .library-scroll--list.is-sorted-by-added :is(.list-head > :nth-child(6), .row__when) {
@@ -678,7 +732,7 @@
 
 @media (max-width: 980px) {
   .library-scroll--list {
-    --cols: 36px minmax(140px, 1fr) 104px 84px 88px 32px;
+    --cols: 36px minmax(140px, 1fr) 104px 124px 88px 32px;
   }
   .list-head > :is(:nth-child(6), :nth-child(7)),
   .row__when,
@@ -801,6 +855,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .tile__running-dot {
+    animation: none;
+  }
   .tile,
   .tile:hover,
   .tile:focus-visible,

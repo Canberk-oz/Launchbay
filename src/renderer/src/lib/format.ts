@@ -51,6 +51,16 @@ export function sizeText(game: Pick<Game, 'sizeOnDisk' | 'sizeStatus' | 'platfor
   }
 }
 
+/**
+ * A game's playtime for display. The store's own figure (Steam) is shown
+ * plainly; Launchbay's measured one (Epic, Xbox) always carries its source.
+ */
+export function playtimeInfo(game: Pick<Game, 'playtimeMinutes' | 'trackedMinutes'>): { value: string; trackedByLaunchbay: boolean } | null {
+  if (game.playtimeMinutes) return { value: formatPlaytime(game.playtimeMinutes), trackedByLaunchbay: false }
+  if (game.trackedMinutes) return { value: formatPlaytime(game.trackedMinutes), trackedByLaunchbay: true }
+  return null
+}
+
 /** A date as relative time, or a dash when unknown (unlike formatRelative's "Never"). */
 export function formatWhen(epochMs: number | null, now = Date.now()): string {
   return epochMs ? formatRelative(epochMs, now) : '—'

@@ -15,7 +15,9 @@ interface GameTileProps {
 
 export function tileMeta(game: Game): string {
   const parts = [PLATFORM_LABELS[game.platform]]
+  // Only the store's own playtime: Launchbay-tracked time needs its full label, which the caption can't fit.
   if (game.playtimeMinutes) parts.push(formatPlaytime(game.playtimeMinutes))
+  if (game.isRunning) parts.push('Running')
   if (game.updateAvailable) parts.push('Update ready')
   return parts.join(' · ')
 }
@@ -57,6 +59,7 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
   if (game.isFavorite) classes.push('is-favorite')
   if (error) classes.push('is-failed')
   if (launching) classes.push('is-launching')
+  if (game.isRunning) classes.push('is-running')
 
   return (
     <div
@@ -65,7 +68,7 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       tabIndex={0}
       data-game-id={game.id}
       style={game.coverAmbient ? ({ '--ambient': game.coverAmbient } as React.CSSProperties) : undefined}
-      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}${game.updateAvailable ? ', update ready' : ''}`}
+      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}${game.isRunning ? ', running' : ''}${game.updateAvailable ? ', update ready' : ''}`}
       onPointerEnter={preview.onPointerEnter}
       onPointerLeave={preview.onPointerLeave}
       onClick={launch}
@@ -122,6 +125,13 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       >
         <StarIcon filled={game.isFavorite} size={15} />
       </button>
+
+      {game.isRunning && !error && (
+        <span className="tile__running" aria-hidden="true">
+          <span className="tile__running-dot" />
+          <span className="spec">Running</span>
+        </span>
+      )}
 
       {error && (
         <span className="tile__error" role="status">

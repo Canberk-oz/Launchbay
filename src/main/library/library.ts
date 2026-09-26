@@ -11,6 +11,8 @@ import type { CoverSource, GameProvider, ScannedGame } from '../providers/types'
 import { JsonStore } from '../util/fsutil'
 import { createLogger } from '../util/log'
 import { addedAtFrom } from './addedAt'
+import type { WatchTarget } from '../launchWatch'
+import { trackSessions } from './sessions'
 import type { MediaService } from './media'
 import { SizeService } from './sizes'
 
@@ -38,6 +40,8 @@ interface UserGameState {
   addedAt?: number
   /** Collections the game is in. Kept when the game is uninstalled, like favorites. */
   tags?: string[]
+  /** Playtime Launchbay measured from sessions it saw (seconds), separate from any store figure. */
+  trackedSeconds?: number
 }
 
 interface UserData {
@@ -91,6 +95,11 @@ export class LibraryService extends EventEmitter {
   private scanning: Promise<void> | null = null
   private queued: { manual: boolean } | null = null
   // Changes not yet sent to the renderer; see drainChanges().
+  // Running games (from the process watcher) and when each one's session began.
+  private running: ReadonlySet<string> = new Set()
+  private readonly sessionStarts = new Map<string, number>()
+  private targetsCache: { version: number; targets: WatchTarget[] } | null = null
+  private gamesVersion = 0
   private readonly dirty = new Set<string>()
   private readonly removed = new Set<string>()
   private seq = 0
@@ -145,9 +154,43 @@ export class LibraryService extends EventEmitter {
     await Promise.all([this.cache.flush(), this.user.flush(), this.sizes.flush()])
   }
 
-  /** Stops background work (app quitting). */
+  /** Stops background work (app quitting). Open sessions are counted up to now. */
   dispose(): void {
+    this.setRunning(new Set())
     this.sizes.dispose()
+  }
+
+  /** What the process watcher should look for: each game's LaunchWatch. */
+  watchTargets(): readonly WatchTarget[] {
+    if (this.targetsCache?.version === this.gamesVersion) return this.targetsCache.targets
+    const targets: WatchTarget[] = []
+    for (const g of this.games.values()) {
+      const watch = providerFor(g.platform).launchWatch?.(this.toGame(g))
+      if (watch) targets.push({ id: g.id, watch })
+    }
+    this.targetsCache = { version: this.gamesVersion, targets }
+    return targets
+  }
+
+  /**
+   * The games running right now, from the process watcher. Sessions that end
+   * add to the game's Launchbay-tracked playtime and set its last played.
+   */
+  setRunning(ids: ReadonlySet<string>, now = Date.now()): void {
+    const previous = this.running
+    this.running = ids
+    const { started, ended } = trackSessions(this.sessionStarts, ids, now)
+    for (const id of started) this.userState(id).lastPlayed = now
+    for (const { id, seconds } of ended) {
+      const state = this.userState(id)
+      state.trackedSeconds = (state.trackedSeconds ?? 0) + seconds
+      state.lastPlayed = now
+    }
+    if (started.length || ended.length) this.user.save()
+    for (const id of new Set([...previous, ...ids])) {
+      if (previous.has(id) !== ids.has(id) && this.games.has(id)) this.touch(id)
+    }
+    for (const { id } of ended) if (this.games.has(id)) this.touch(id)
   }
 
   list(): Game[] {
@@ -225,6 +268,7 @@ export class LibraryService extends EventEmitter {
 
     await this.recordArrivals(arrived, now)
 
+    this.gamesVersion++
     this.cache.data = { version: 1, lastScanAt: now, games: [...this.games.values()] }
     this.cache.save()
     log.info(`scan finished in ${Date.now() - started} ms (${this.games.size} games)`)
@@ -335,6 +379,8 @@ export class LibraryService extends EventEmitter {
       trailerState: providerFor(g.platform).resolveTrailer ? this.media.trailerState(g.id) : 'none',
       ...this.sizeOf(g),
       playtimeMinutes: g.playtimeMinutes,
+      trackedMinutes: user.trackedSeconds ? Math.max(1, Math.round(user.trackedSeconds / 60)) : null,
+      isRunning: this.running.has(g.id),
       isFavorite: !!user.favorite,
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,
       lastPlayed,

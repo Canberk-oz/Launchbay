@@ -105,3 +105,52 @@ export async function runPowerShellJson<T>(script: string, opts?: PowerShellOpti
   const stdout = (await runPowerShell(script, opts)).trim()
   return JSON.parse(stdout || 'null') as T
 }
+
+export interface PowerShellProcess {
+  stop(): void
+}
+
+/**
+ * Starts a long-running PowerShell script and hands each line it writes to
+ * `onLine`. `onExit` runs once when the process ends, unless it was stopped.
+ */
+export function startPowerShell(
+  script: string,
+  onLine: (line: string) => void,
+  onExit: (code: number | null, stderr: string) => void
+): PowerShellProcess {
+  const encoded = Buffer.from(`${PRELUDE}\n${script}`, 'utf16le').toString('base64')
+  const child = spawn(powershellExe(), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+  let stopped = false
+  let buffered = ''
+  const err: Buffer[] = []
+  child.stdout.on('data', (d: Buffer) => {
+    buffered += d.toString('utf8')
+    let nl: number
+    while ((nl = buffered.indexOf('\n')) >= 0) {
+      const line = buffered.slice(0, nl).replace(/\r$/, '').replace(/^\ufeff/, '')
+      buffered = buffered.slice(nl + 1)
+      if (line) onLine(line)
+    }
+  })
+  child.stderr.on('data', (d: Buffer) => {
+    if (err.length < 64) err.push(d)
+  })
+  const exit = (code: number | null): void => {
+    if (stopped) return
+    stopped = true
+    onExit(code, Buffer.concat(err).toString('utf8'))
+  }
+  child.on('error', () => exit(null))
+  child.on('close', (code) => exit(code))
+  return {
+    stop() {
+      if (stopped) return
+      stopped = true
+      child.kill()
+    }
+  }
+}

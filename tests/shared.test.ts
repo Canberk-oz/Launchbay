@@ -44,6 +44,8 @@ function game(partial: Partial<Game>): Game {
     sizeOnDisk: null,
     sizeStatus: 'unreported',
     playtimeMinutes: null,
+    trackedMinutes: null,
+    isRunning: false,
     isFavorite: false,
     favoritedAt: null,
     lastPlayed: null,

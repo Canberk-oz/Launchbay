@@ -15,7 +15,10 @@ export interface ExportedGame {
   sizeOnDiskBytes: number | null
   /** Why a size is missing: measuring, denied (access), failed or unreported. */
   sizeStatus: Game['sizeStatus']
+  /** The store's own playtime (Steam). */
   playtimeMinutes: number | null
+  /** Playtime Launchbay measured from sessions it saw; never the store's own figure. */
+  playtimeTrackedByLaunchbayMinutes: number | null
   lastPlayed: string | null
   addedAt: string | null
   /** null: the store doesn't report updates (Epic, Xbox). */
@@ -39,6 +42,7 @@ export function toExported(games: Game[]): ExportedGame[] {
       sizeOnDiskBytes: g.sizeOnDisk,
       sizeStatus: g.sizeStatus,
       playtimeMinutes: g.playtimeMinutes,
+      playtimeTrackedByLaunchbayMinutes: g.trackedMinutes,
       lastPlayed: iso(g.lastPlayed),
       addedAt: iso(g.addedAt),
       updateAvailable: g.updateAvailable,
@@ -62,6 +66,7 @@ const CSV_COLUMNS: Array<keyof ExportedGame> = [
   'sizeOnDiskBytes',
   'sizeStatus',
   'playtimeMinutes',
+  'playtimeTrackedByLaunchbayMinutes',
   'lastPlayed',
   'addedAt',
   'updateAvailable',

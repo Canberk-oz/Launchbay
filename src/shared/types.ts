@@ -58,7 +58,16 @@ export interface Game {
    * `unreported`: the store gives no size and there is nothing to measure.
    */
   sizeStatus: SizeStatus
+  /** The store's own playtime (Steam). Authoritative; Epic and Xbox don't record one locally. */
   playtimeMinutes: number | null
+  /**
+   * Playtime Launchbay measured itself from the sessions its running-game
+   * watcher saw. Never the store's own figure: show it labeled as tracked by
+   * Launchbay. Null when no session has been seen.
+   */
+  trackedMinutes: number | null
+  /** Launchbay's watcher sees the game running right now. */
+  isRunning: boolean
   isFavorite: boolean
   /** Epoch ms. */
   favoritedAt: number | null

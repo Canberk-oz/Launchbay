@@ -163,7 +163,12 @@ function PropertiesBody({ game, focus }: { game: Game; focus: boolean }): React.
     }
   }, [game.id, game.coverImageUrl])
 
-  const playtime = game.playtimeMinutes ? formatPlaytime(game.playtimeMinutes) : notTracked(game)
+  const tracked = !game.playtimeMinutes && game.trackedMinutes
+  const playtime = game.playtimeMinutes
+    ? formatPlaytime(game.playtimeMinutes)
+    : game.trackedMinutes
+      ? `${formatPlaytime(game.trackedMinutes)} · tracked by Launchbay`
+      : `${notTracked(game)}. Launchbay tracks the sessions it sees from now on.`
   const lastPlayed = when(game.lastPlayed, 'Never')
   const added = when(game.addedAt, 'Not known yet')
   const update =
@@ -194,7 +199,8 @@ function PropertiesBody({ game, focus }: { game: Game; focus: boolean }): React.
       <SheetBlock title="Game">
         <dl className="spec-table">
           <Row label="Size on disk" value={sizeText(game, 'long')} muted={game.sizeStatus !== 'known'} long={game.sizeStatus === 'denied' || game.sizeStatus === 'failed'} />
-          <Row label="Playtime" value={playtime} muted={!game.playtimeMinutes} />
+          {game.isRunning && <Row label="Status" value="Running now" />}
+          <Row label="Playtime" value={playtime} muted={!game.playtimeMinutes && !tracked} long={!game.playtimeMinutes && !tracked} />
           <Row label="Last played" value={lastPlayed.text} muted={lastPlayed.muted} />
           <Row label="Added" value={added.text} muted={added.muted} />
           <Row label="Updates" value={update.text} muted={update.muted} />
