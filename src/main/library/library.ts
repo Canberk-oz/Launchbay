@@ -3,7 +3,7 @@
 
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
-import type { Game, Platform, ScanStatus } from '@shared/types'
+import type { Game, LibraryPatch, Platform, ScanStatus } from '@shared/types'
 import { providerFor, providers } from '../providers'
 import type { CoverSource, ScannedGame } from '../providers/types'
 import { JsonStore } from '../util/fsutil'
@@ -14,7 +14,7 @@ const log = createLogger('library')
 
 const SCAN_TIMEOUT_MS = 90_000
 
-interface StoredGame extends ScannedGame {
+export interface StoredGame extends ScannedGame {
   id: string
   lastScanned: number
 }
@@ -51,6 +51,12 @@ function normalizeUserData(raw: unknown): UserData {
   return { version: 1, games: r?.games && typeof r.games === 'object' ? r.games : {} }
 }
 
+/** Whether a rescan found a game exactly as it was (ignoring when it was scanned). */
+export function sameScan(before: StoredGame, after: ScannedGame): boolean {
+  const { id: _id, lastScanned: _at, ...rest } = before
+  return JSON.stringify(rest) === JSON.stringify(after)
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} scan timed out`)), ms)
@@ -74,13 +80,45 @@ export class LibraryService extends EventEmitter {
   private readonly games = new Map<string, StoredGame>()
   private scanning: Promise<void> | null = null
   private queued: { manual: boolean } | null = null
+  // Changes not yet sent to the renderer; see drainChanges().
+  private readonly dirty = new Set<string>()
+  private readonly removed = new Set<string>()
+  private seq = 0
 
   constructor(root: string, media: MediaService) {
     super()
     this.cache = new JsonStore<LibraryCache>(join(root, 'library.json'), normalizeCache(null))
     this.user = new JsonStore<UserData>(join(root, 'userdata.json'), normalizeUserData(null))
     this.media = media
-    media.on('changed', () => this.emit('changed'))
+    media.on('changed', (id: string) => {
+      if (this.games.has(id)) this.touch(id)
+    })
+  }
+
+  /** Marks a game for the next patch and announces that one is due. */
+  private touch(id: string): void {
+    this.dirty.add(id)
+    this.removed.delete(id)
+    this.emit('changed')
+  }
+
+  /** The number of the last patch handed out; the initial state includes everything up to it. */
+  patchSeq(): number {
+    return this.seq
+  }
+
+  /** Takes the pending changes as one patch, or null when nothing changed. */
+  drainChanges(): LibraryPatch | null {
+    if (this.dirty.size === 0 && this.removed.size === 0) return null
+    const upsert: Game[] = []
+    for (const id of this.dirty) {
+      const stored = this.games.get(id)
+      if (stored) upsert.push(this.toGame(stored))
+    }
+    const patch = { seq: ++this.seq, upsert, remove: [...this.removed] }
+    this.dirty.clear()
+    this.removed.clear()
+    return patch
   }
 
   async init(): Promise<void> {
@@ -139,10 +177,18 @@ export class LibraryService extends EventEmitter {
         log.error(`${providers[index].label} scan failed`, result.reason)
         return
       }
-      for (const [id, g] of this.games) if (g.platform === platform) this.games.delete(id)
+      const previous = new Map([...this.games].filter(([, g]) => g.platform === platform))
+      for (const id of previous.keys()) this.games.delete(id)
       for (const scanned of result.value) {
         const id = `${scanned.platform}:${scanned.platformId}`
+        const before = previous.get(id)
+        previous.delete(id)
         this.games.set(id, { ...scanned, id, lastScanned: now })
+        if (!before || !sameScan(before, scanned)) this.touch(id)
+      }
+      for (const id of previous.keys()) {
+        this.dirty.delete(id)
+        this.removed.add(id)
       }
       log.info(`${providers[index].label}: ${result.value.length} game(s)`)
     })
@@ -150,7 +196,7 @@ export class LibraryService extends EventEmitter {
     this.cache.data = { version: 1, lastScanAt: now, games: [...this.games.values()] }
     this.cache.save()
     log.info(`scan finished in ${Date.now() - started} ms (${this.games.size} games)`)
-    this.emit('changed')
+    if (this.removed.size > 0) this.emit('changed')
 
     const all = [...this.games.values()]
     void this.media.syncCovers(all, { retryFailed: manual })
@@ -170,19 +216,19 @@ export class LibraryService extends EventEmitter {
     if (favorite) state.favoritedAt = Date.now()
     else delete state.favoritedAt
     this.user.save()
-    this.emit('changed')
+    this.touch(id)
   }
 
   setHidden(id: string, hidden: boolean): void {
     this.userState(id).hidden = hidden
     this.user.save()
-    this.emit('changed')
+    this.touch(id)
   }
 
   markPlayed(id: string): void {
     this.userState(id).lastPlayed = Date.now()
     this.user.save()
-    this.emit('changed')
+    this.touch(id)
   }
 
   private toGame(g: StoredGame): Game {
@@ -202,7 +248,6 @@ export class LibraryService extends EventEmitter {
       trailerState: providerFor(g.platform).resolveTrailer ? this.media.trailerState(g.id) : 'none',
       sizeOnDisk: g.sizeOnDisk,
       playtimeMinutes: g.playtimeMinutes,
-      lastScanned: g.lastScanned,
       isFavorite: !!user.favorite,
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,
       lastPlayed,

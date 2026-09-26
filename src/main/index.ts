@@ -101,7 +101,13 @@ async function main(): Promise<void> {
 
   registerIpc({ library, media, settings, hotkeys, launcher, windows, isPackaged: app.isPackaged, startHidden })
 
-  library.on('changed', throttle(() => send(IPC.libraryUpdated, library.list()), 150))
+  library.on(
+    'changed',
+    throttle(() => {
+      const patch = library.drainChanges()
+      if (patch) send(IPC.libraryPatch, patch)
+    }, 150)
+  )
   library.on('scan-status', (status) => send(IPC.scanStatus, status))
   settings.on('changed', (next: Settings, prev: Settings) => {
     send(IPC.settingsChanged, next)

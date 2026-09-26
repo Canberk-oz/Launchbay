@@ -24,7 +24,6 @@ const api = window.launchbay
 function useMainProcessEvents(setAnim: (a: 'in' | 'out' | null) => void): void {
   useEffect(() => {
     const offs = [
-      api.onLibraryUpdated((games) => useStore.setState({ games })),
       api.onScanStatus((scan) => useStore.setState({ scan })),
       api.onSettingsChanged((settings) => useStore.setState({ settings: { ...settings, ...pendingSettings() } })),
       api.onHotkeyStatus((hotkey) => useStore.setState({ hotkey })),

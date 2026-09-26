@@ -5,10 +5,11 @@ import {
   type Game,
   type HotkeyStatus,
   type InitialState,
+  type LibraryPatch,
   type ScanStatus,
   type Settings
 } from '@shared/types'
-import type { PlatformFilter } from './lib/library'
+import { applyLibraryPatch, type PlatformFilter } from './lib/library'
 
 export interface Toast {
   id: number
@@ -43,6 +44,8 @@ export interface AppState {
   appVersion: string
   isPackaged: boolean
   games: Game[]
+  /** The last library patch reflected in `games`. */
+  librarySeq: number
   settings: Settings
   hotkey: HotkeyStatus
   scan: ScanStatus
@@ -65,6 +68,7 @@ export const useStore = create<AppState>(() => ({
   appVersion: '',
   isPackaged: false,
   games: [],
+  librarySeq: 0,
   settings: {
     hotkey: DEFAULT_HOTKEY,
     hotkeyEnabled: true,
@@ -94,9 +98,17 @@ export function hydrate(initial: InitialState): void {
     appVersion: initial.version,
     isPackaged: initial.isPackaged,
     games: initial.games,
+    librarySeq: initial.librarySeq,
     settings: initial.settings,
     hotkey: initial.hotkey,
     scan: initial.scan,
     windowHidden: initial.startHidden
   })
+}
+
+/** Merges a library patch, skipping any the current games already include. */
+export function applyPatch(patch: LibraryPatch): void {
+  useStore.setState((s) =>
+    patch.seq <= s.librarySeq ? {} : { games: applyLibraryPatch(s.games, patch), librarySeq: patch.seq }
+  )
 }

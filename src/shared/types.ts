@@ -48,8 +48,6 @@ export interface Game {
   trailerState: TrailerState
   sizeOnDisk: number | null
   playtimeMinutes: number | null
-  /** Epoch ms of the last scan that saw this game. */
-  lastScanned: number
   isFavorite: boolean
   /** Epoch ms. */
   favoritedAt: number | null
@@ -107,9 +105,23 @@ export type LaunchResult =
   | { ok: true; confirmed: boolean }
   | { ok: false; error: string }
 
+/**
+ * The games that changed since the previous patch. `upsert` carries whole
+ * records (new or changed); `remove` the ids that left the library. `seq`
+ * increases by one per patch, so the renderer can skip patches its initial
+ * state already includes.
+ */
+export interface LibraryPatch {
+  seq: number
+  upsert: Game[]
+  remove: string[]
+}
+
 export interface InitialState {
   version: string
   games: Game[]
+  /** The last patch already reflected in `games`. */
+  librarySeq: number
   settings: Settings
   scan: ScanStatus
   hotkey: HotkeyStatus

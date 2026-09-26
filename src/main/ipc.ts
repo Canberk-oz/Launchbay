@@ -27,6 +27,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.getInitialState, (): InitialState => ({
     version: app.getVersion(),
     games: library.list(),
+    librarySeq: library.patchSeq(),
     settings: settings.get(),
     scan: library.scanStatus(),
     hotkey: hotkeys.getStatus(),

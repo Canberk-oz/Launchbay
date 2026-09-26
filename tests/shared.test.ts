@@ -42,7 +42,6 @@ function game(partial: Partial<Game>): Game {
     trailerState: 'none',
     sizeOnDisk: null,
     playtimeMinutes: null,
-    lastScanned: 0,
     isFavorite: false,
     favoritedAt: null,
     lastPlayed: null,
@@ -82,4 +81,20 @@ test('image sniffing', () => {
   assert.deepEqual(imageSizeFromBuffer(png), { width: 600, height: 900 })
   assert.equal(imageExtension(png), 'png')
   assert.equal(imageExtension(Buffer.from('<!doctype html><html>')), null)
+})
+
+test('library patches: upsert, add and remove by id, leaving untouched games as they were', async () => {
+  const { applyLibraryPatch } = await import('../src/renderer/src/lib/library')
+  const a = game({ name: 'A' })
+  const b = game({ name: 'B' })
+  const c = game({ name: 'C' })
+  const games = [a, b, c]
+  const b2 = { ...b, isFavorite: true }
+  const d = game({ name: 'D' })
+  const next = applyLibraryPatch(games, { upsert: [b2, d], remove: [c.id] })
+  assert.deepEqual(next.map((g) => g.name), ['A', 'B', 'D'])
+  assert.equal(next[0], a) // same object: a memoized tile skips re-rendering
+  assert.equal(next[1], b2)
+  assert.equal(applyLibraryPatch(games, { upsert: [], remove: [] }), games)
+  assert.deepEqual(applyLibraryPatch(games, { upsert: [], remove: ['nope'] }).length, 3)
 })

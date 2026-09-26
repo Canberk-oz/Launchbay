@@ -18,7 +18,7 @@ export const IPC = {
   clearTrailerCache: 'media:clear-trailers',
 
   // events
-  libraryUpdated: 'library:updated',
+  libraryPatch: 'library:patch',
   scanStatus: 'library:scan-status',
   settingsChanged: 'settings:changed',
   hotkeyStatus: 'hotkey:status',

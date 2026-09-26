@@ -1,4 +1,4 @@
-import { PLATFORM_LABELS, type Game, type Platform, type SortMode } from '@shared/types'
+import { PLATFORM_LABELS, type Game, type LibraryPatch, type Platform, type SortMode } from '@shared/types'
 
 export type PlatformFilter = 'all' | Platform
 
@@ -6,6 +6,25 @@ export interface Section {
   key: 'favorites' | 'library'
   title: string
   games: Game[]
+}
+
+/**
+ * Applies a patch from the main process. Games it doesn't mention keep their
+ * object identity, so memoized tiles for them don't re-render.
+ */
+export function applyLibraryPatch(games: Game[], patch: Pick<LibraryPatch, 'upsert' | 'remove'>): Game[] {
+  if (patch.upsert.length === 0 && patch.remove.length === 0) return games
+  const updates = new Map(patch.upsert.map((g) => [g.id, g]))
+  const removed = new Set(patch.remove)
+  const next: Game[] = []
+  for (const game of games) {
+    if (removed.has(game.id)) continue
+    const update = updates.get(game.id)
+    next.push(update ?? game)
+    updates.delete(game.id)
+  }
+  for (const game of updates.values()) next.push(game)
+  return next
 }
 
 /** Case-, accent- and dotless-i-insensitive search key. */

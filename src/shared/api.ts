@@ -1,9 +1,9 @@
 import type {
   ContextAction,
-  Game,
   HotkeyChangeResult,
   HotkeyStatus,
   InitialState,
+  LibraryPatch,
   LaunchResult,
   MediaCacheInfo,
   ScanStatus,
@@ -29,7 +29,7 @@ export interface LaunchbayApi {
   getMediaCacheInfo(): Promise<MediaCacheInfo>
   clearTrailerCache(): Promise<void>
 
-  onLibraryUpdated(cb: (games: Game[]) => void): Unsubscribe
+  onLibraryPatch(cb: (patch: LibraryPatch) => void): Unsubscribe
   onScanStatus(cb: (status: ScanStatus) => void): Unsubscribe
   onSettingsChanged(cb: (settings: Settings) => void): Unsubscribe
   onHotkeyStatus(cb: (status: HotkeyStatus) => void): Unsubscribe

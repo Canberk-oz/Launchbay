@@ -120,9 +120,10 @@ export class MediaService extends EventEmitter {
     return this.store.flush()
   }
 
-  private changed(): void {
+  /** Persists the state and tells the library which game's media changed. */
+  private changed(id: string): void {
     this.store.save()
-    this.emit('changed')
+    this.emit('changed', id)
   }
 
   // ---------------------------------------------------------------- covers
@@ -227,7 +228,7 @@ export class MediaService extends EventEmitter {
       }
     }
     this.state.covers[game.id] = { status: 'failed', error: lastError, updatedAt: Date.now() }
-    this.changed()
+    this.changed(game.id)
   }
 
   private async saveCover(id: string, art: Artwork, origin: string): Promise<void> {
@@ -245,7 +246,7 @@ export class MediaService extends EventEmitter {
       frame: art.frame,
       ...(art.background ? { background: art.background } : {})
     }
-    this.changed()
+    this.changed(id)
   }
 
   // -------------------------------------------------------------- trailers
@@ -314,7 +315,7 @@ export class MediaService extends EventEmitter {
         record = { status: 'failed', error: errorMessage(err), checkedAt: Date.now() }
       }
       this.state.trailers[game.id] = record
-      this.changed()
+      this.changed(game.id)
       return record
     })().finally(() => this.lookups.delete(game.id))
     this.lookups.set(game.id, job)
@@ -379,7 +380,7 @@ export class MediaService extends EventEmitter {
         log.warn(`trailer preview for ${id} failed:`, errorMessage(err))
         if (!isTransientError(err)) {
           this.state.trailers[id] = { status: 'failed', error: errorMessage(err), checkedAt: Date.now() }
-          this.changed()
+          this.changed(id)
         }
         return null
       })
@@ -417,7 +418,7 @@ export class MediaService extends EventEmitter {
     const record = this.state.trailers[id]
     if (record?.status === 'available') {
       record.file = file
-      this.changed()
+      this.store.save() // the cached file is not part of the game record
     }
   }
 
