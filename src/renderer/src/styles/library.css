@@ -628,12 +628,6 @@
   text-overflow: ellipsis;
 }
 
-.row__tag--running {
-  background: var(--accent);
-  box-shadow: none;
-  color: var(--accent-ink);
-}
-
 .row__num--tracked {
   display: grid;
   justify-items: end;
@@ -654,6 +648,13 @@
   box-shadow: inset 0 0 0 1px var(--accent);
   color: var(--accent);
   font-size: var(--text-micro);
+}
+
+/* After .row__tag so its colors win. */
+.row__tag--running {
+  background: var(--accent);
+  box-shadow: none;
+  color: var(--accent-ink);
 }
 
 .row__error {
