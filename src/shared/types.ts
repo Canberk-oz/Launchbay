@@ -178,6 +178,22 @@ export type ContextAction = 'launch' | 'properties' | 'new-collection'
 export interface GameDetails {
   /** Where the cached cover came from: a URL or a local file path. */
   coverSource: string | null
+  /** Null when the store keeps no screenshots Launchbay can read (everything but Steam). */
+  screenshots: {
+    /** The newest ones, at most MAX_SCREENSHOTS. */
+    items: Screenshot[]
+    total: number
+  } | null
+}
+
+export const MAX_SCREENSHOTS = 60
+
+export interface Screenshot {
+  /** glmedia:// URL of the thumbnail (or the image itself when there is none). */
+  thumbUrl: string
+  /** glmedia:// URL of the full image; pass it to openScreenshot. */
+  url: string
+  takenAt: number
 }
 
 export type ExportResult =

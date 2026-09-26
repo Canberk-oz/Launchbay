@@ -6,7 +6,7 @@ import { join, win32 } from 'node:path'
 import { parseVdf, vdfObject, vdfPath, vdfString, type VdfObject } from '../util/vdf'
 import { isDirectory, pathExists } from '../util/fsutil'
 import { readRegistry } from '../util/registry'
-import type { CoverSource, ScannedGame } from './types'
+import type { CoverSource, ScannedGame, ScreenshotFile } from './types'
 
 const DEFAULT_STEAM_PATH = 'C:\\Program Files (x86)\\Steam'
 const CDN = 'https://cdn.akamai.steamstatic.com/steam/apps'
@@ -268,9 +268,51 @@ async function localCacheImages(steamPath: string, appid: string): Promise<{ cap
   return { capsule, header }
 }
 
+// The Steam folder found by the last scan, so screenshot lookups don't query the registry again.
+let lastSteamPath: string | null = null
+
+/** The Steam folder: the last scan's, or found now. Null when Steam isn't installed or can't be read. */
+export async function steamRoot(): Promise<string | null> {
+  return lastSteamPath ?? (await findSteamPath().catch(() => null))
+}
+
+/**
+ * Screenshots Steam keeps for an app, for every local Steam user
+ * (userdata/<account>/760/remote/<appid>/screenshots), newest first, with
+ * Steam's own thumbnails where it made them. Unreadable folders are skipped.
+ */
+export async function findScreenshots(steamPath: string, appid: string): Promise<ScreenshotFile[]> {
+  if (!/^\d+$/.test(appid)) return []
+  const userdata = join(steamPath, 'userdata')
+  const users = await fs.readdir(userdata).catch(() => [] as string[])
+  const found: ScreenshotFile[] = []
+  for (const user of users) {
+    if (!/^\d+$/.test(user)) continue
+    const dir = join(userdata, user, '760', 'remote', appid, 'screenshots')
+    const names = await fs.readdir(dir).catch(() => [] as string[])
+    const thumbs = new Set((await fs.readdir(join(dir, 'thumbnails')).catch(() => [] as string[])).map((n) => n.toLowerCase()))
+    await Promise.all(
+      names
+        .filter((n) => /\.(jpe?g|png)$/i.test(n))
+        .map(async (name) => {
+          const path = join(dir, name)
+          const st = await fs.stat(path).catch(() => null)
+          if (!st?.isFile()) return
+          found.push({
+            path,
+            takenAt: st.mtimeMs,
+            ...(thumbs.has(name.toLowerCase()) ? { thumbnail: join(dir, 'thumbnails', name) } : {})
+          })
+        })
+    )
+  }
+  return found.sort((a, b) => b.takenAt - a.takenAt)
+}
+
 export async function scanSteam(env: SteamLocator = machine): Promise<ScannedGame[]> {
   const steamPath = await findSteamPath(env)
   if (!steamPath) return []
+  if (env === machine) lastSteamPath = steamPath
 
   const [libraries, userStats] = await Promise.all([readLibraryPaths(steamPath), readUserStats(steamPath)])
   const byAppId = new Map<string, ScannedGame>()

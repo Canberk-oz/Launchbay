@@ -10,7 +10,7 @@ import {
 } from 'electron'
 import { EventEmitter } from 'node:events'
 import { sameCollection } from '@shared/collections'
-import type { ContextAction, Game, GameDetails, LaunchResult, Notice } from '@shared/types'
+import { MAX_SCREENSHOTS, type ContextAction, type Game, type GameDetails, type LaunchResult, type Notice } from '@shared/types'
 import type { LaunchService } from './launch'
 import type { LibraryService } from './library/library'
 import type { MediaService } from './library/media'
@@ -57,9 +57,34 @@ export class GameActions extends EventEmitter {
     return stored ? (providerFor(stored.platform).storePageUrl?.(stored) ?? null) : null
   }
 
-  details(id: string): GameDetails | null {
-    if (!this.library.get(id)) return null
-    return { coverSource: this.media.coverSource(id) }
+  async details(id: string): Promise<GameDetails | null> {
+    const game = this.library.get(id)
+    if (!game) return null
+    const provider = providerFor(game.platform)
+    let screenshots: GameDetails['screenshots'] = null
+    if (provider.screenshots) {
+      const files = await provider.screenshots(game).catch((err) => {
+        log.warn(`screenshots for ${id} failed`, err)
+        return []
+      })
+      screenshots = {
+        total: files.length,
+        items: files.slice(0, MAX_SCREENSHOTS).map((f) => ({
+          url: this.media.fileUrl(f.path),
+          thumbUrl: this.media.fileUrl(f.thumbnail ?? f.path),
+          takenAt: f.takenAt
+        }))
+      }
+    }
+    return { coverSource: this.media.coverSource(id), screenshots }
+  }
+
+  /** Opens a screenshot listed by details() in the system image viewer. */
+  async openScreenshot(url: string): Promise<void> {
+    const path = this.media.filePath(url)
+    if (!path) return
+    const error = await shell.openPath(path)
+    if (error) this.notify({ tone: 'error', title: 'Couldn’t open the screenshot', message: error })
   }
 
   launch(id: string): Promise<LaunchResult> {

@@ -322,6 +322,45 @@
 }
 
 /* Properties: the game's cover and name above its spec blocks. */
+.shots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.shots__item {
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-frame);
+  overflow: hidden;
+  background: var(--ground);
+  cursor: zoom-in;
+}
+
+.shots__item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 160ms var(--ease-out);
+}
+
+.shots__item:hover img,
+.shots__item:focus-visible img {
+  transform: scale(1.04);
+}
+
+.shots__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shots__more {
+  margin: 8px 0 0;
+}
+
 .collections {
   display: grid;
   gap: 10px;

@@ -128,6 +128,29 @@ function CollectionsEditor({ game, focus }: { game: Game; focus: boolean }): Rea
   )
 }
 
+const shotDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+
+/** Steam's local screenshots, newest first; a click opens one in the system viewer. */
+function Screenshots({ shots }: { shots: NonNullable<GameDetails['screenshots']> }): React.JSX.Element {
+  if (shots.total === 0) return <p className="muted">No screenshots yet. Steam saves them when you press F12 in a game.</p>
+  return (
+    <>
+      <div className="shots">
+        {shots.items.map((s) => (
+          <button key={s.url} className="shots__item" onClick={() => void api.openScreenshot(s.url)} title={shotDate.format(s.takenAt)}>
+            <img src={s.thumbUrl} alt={`Screenshot, ${shotDate.format(s.takenAt)}`} loading="lazy" decoding="async" draggable={false} />
+          </button>
+        ))}
+      </div>
+      {shots.total > shots.items.length && (
+        <p className="muted shots__more">
+          Showing the newest {shots.items.length} of {shots.total}.
+        </p>
+      )}
+    </>
+  )
+}
+
 function PropertiesBody({ game, focus }: { game: Game; focus: boolean }): React.JSX.Element {
   const [details, setDetails] = useState<GameDetails | null>(null)
 
@@ -186,6 +209,12 @@ function PropertiesBody({ game, focus }: { game: Game; focus: boolean }): React.
           <Row label="Launchbay ID" value={game.id} long />
         </dl>
       </SheetBlock>
+
+      {details?.screenshots && (
+        <SheetBlock title={details.screenshots.total ? `Screenshots · ${details.screenshots.total}` : 'Screenshots'}>
+          <Screenshots shots={details.screenshots} />
+        </SheetBlock>
+      )}
 
       <SheetBlock title="Cover">
         <dl className="spec-table">

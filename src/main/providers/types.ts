@@ -48,6 +48,15 @@ export interface TrailerInfo {
   url: string
 }
 
+/** A screenshot the store keeps on this PC. */
+export interface ScreenshotFile {
+  path: string
+  /** A smaller copy the store made, when there is one. */
+  thumbnail?: string
+  /** Epoch ms (the file's modification time). */
+  takenAt: number
+}
+
 export interface LaunchWatch {
   /** A process whose image lies under one of these folders means the game started. */
   dirs: string[]
@@ -87,4 +96,7 @@ export interface GameProvider {
    * be built for this game (the menu then leaves the item out).
    */
   storePageUrl?(game: Pick<ScannedGame, 'platformId' | 'storeRef'>): string | null
+
+  /** Optional capability: screenshots the store keeps locally, newest first. */
+  screenshots?(game: Game): Promise<ScreenshotFile[]>
 }

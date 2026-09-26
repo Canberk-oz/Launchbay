@@ -38,7 +38,7 @@ npm run dev          # run with hot reload
 - **Overlay:** **Ctrl+Shift+G** (configurable) shows Launchbay centered and on top of whatever you're doing, with the cursor already in search. Type, press **Enter** to play the top match, and press the hotkey or Esc to hide it again. Closing the window keeps Launchbay in the tray, so the hotkey still works.
 - **Right-click a game:** Play, Add/Remove favorite, Open install folder, Open store page, Copy launch command, Hide from library, Properties…. Open store page appears only when the page can be built: always for Steam and Xbox, and for Epic when the launcher's catalog cache has the game's product slug. Hidden games can be restored from Settings.
 - **Export:** Settings → Libraries exports every game (hidden ones included) as CSV or JSON: name, store, IDs, install folder, launch command, size, playtime, last played, date added, update status, favorite and hidden. Unknown values are left empty (CSV) or `null` (JSON).
-- **Properties (Alt+Enter):** a read-only sheet with the game's size, playtime, last played, date added, update status, install folder, launch command, IDs and cover source.
+- **Properties (Alt+Enter):** a read-only sheet (apart from its collections) with the game's size, playtime, last played, date added, update status, install folder, launch command, IDs and cover source. For Steam games it also shows the screenshots Steam keeps on this PC (newest first); click one to open it in your image viewer. Xbox Game Bar captures aren't shown, because they can't be matched to a game reliably.
 
 | Key | Action |
 | --- | --- |

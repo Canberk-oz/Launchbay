@@ -67,6 +67,7 @@ const PREVIEW_SKIP_SECONDS = 6
 
 const MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.gif': 'image/gif',
@@ -556,17 +557,44 @@ export class MediaService extends EventEmitter {
     return { coverBytes, trailerBytes }
   }
 
+  // ------------------------------------------------------- outside files
+
+  /**
+   * Files outside the media cache the renderer may show (Steam screenshots),
+   * by opaque token. Only files the main process registered are served, so
+   * the renderer can't ask for arbitrary paths.
+   */
+  private readonly files = new Map<string, string>()
+
+  /** A glmedia:// URL for a local image, registered for this session. */
+  fileUrl(path: string): string {
+    const ext = extname(path).toLowerCase()
+    const token = `${createHash('sha1').update(path).digest('hex').slice(0, 24)}${ext}`
+    this.files.set(token, path)
+    return `${MEDIA_SCHEME}://files/${token}`
+  }
+
+  /** The file behind a registered glmedia://files URL, or null. */
+  filePath(url: string): string | null {
+    const match = /^glmedia:\/\/files\/([\w.]+)$/.exec(url)
+    return match ? (this.files.get(match[1]) ?? null) : null
+  }
+
   // -------------------------------------------------------------- protocol
 
-  /** glmedia://covers/<file> and glmedia://trailers/<file>, with Range support for video. */
+  /**
+   * glmedia://covers/<file>, glmedia://trailers/<file> (Range support for
+   * video) and glmedia://files/<token> (registered outside files).
+   */
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const dir = url.hostname === 'covers' ? this.coversDir : url.hostname === 'trailers' ? this.trailersDir : null
     const name = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
-    if (!dir || !/^[\w.-]+$/.test(name) || name.includes('..')) {
+    const registered = url.hostname === 'files' ? this.files.get(name) : undefined
+    if ((!dir && !registered) || !/^[\w.-]+$/.test(name) || name.includes('..')) {
       return new Response('Not found', { status: 404 })
     }
-    const path = join(dir, name)
+    const path = registered ?? join(dir!, name)
     let size: number
     try {
       size = (await fs.stat(path)).size
@@ -577,7 +605,7 @@ export class MediaService extends EventEmitter {
     const headers: Record<string, string> = {
       'Content-Type': MIME[extname(name).toLowerCase()] ?? 'application/octet-stream',
       'Accept-Ranges': 'bytes',
-      'Cache-Control': url.hostname === 'covers' ? 'public, max-age=31536000, immutable' : 'no-cache'
+      'Cache-Control': url.hostname === 'trailers' ? 'no-cache' : 'public, max-age=31536000, immutable'
     }
     const body = (start?: number, end?: number): ReadableStream =>
       Readable.toWeb(createReadStream(path, start === undefined ? undefined : { start, end })) as unknown as ReadableStream

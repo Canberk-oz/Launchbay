@@ -27,6 +27,7 @@ export interface LaunchbayApi {
   getTrailer(id: string): Promise<{ src: string } | null>
   showContextMenu(id: string): Promise<void>
   getGameDetails(id: string): Promise<GameDetails | null>
+  openScreenshot(url: string): Promise<void>
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   setHotkey(accelerator: string): Promise<HotkeyChangeResult>
   suspendHotkey(suspended: boolean): Promise<void>

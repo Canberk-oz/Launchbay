@@ -20,6 +20,7 @@ const api: LaunchbayApi = {
   getTrailer: (id) => ipcRenderer.invoke(IPC.getTrailer, id),
   showContextMenu: (id) => ipcRenderer.invoke(IPC.showContextMenu, id),
   getGameDetails: (id) => ipcRenderer.invoke(IPC.getGameDetails, id),
+  openScreenshot: (url) => ipcRenderer.invoke(IPC.openScreenshot, url),
   updateSettings: (patch) => ipcRenderer.invoke(IPC.updateSettings, patch),
   setHotkey: (accelerator) => ipcRenderer.invoke(IPC.setHotkey, accelerator),
   suspendHotkey: (suspended) => ipcRenderer.invoke(IPC.suspendHotkey, suspended),

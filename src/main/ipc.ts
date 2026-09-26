@@ -60,6 +60,8 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(IPC.getGameDetails, (_e, id: unknown) => actions.details(asString(id)))
 
+  ipcMain.handle(IPC.openScreenshot, (_e, url: unknown) => actions.openScreenshot(asString(url)))
+
   ipcMain.handle(IPC.showContextMenu, (event: IpcMainInvokeEvent, id: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
