@@ -1,5 +1,6 @@
 import {
   clipboard,
+  dialog,
   Menu,
   nativeImage,
   nativeTheme,
@@ -21,7 +22,13 @@ import { resourcePath } from './window'
 
 const log = createLogger('actions')
 
-type MenuIcon = 'play' | 'star' | 'star-filled' | 'folder' | 'store' | 'copy' | 'hide' | 'properties' | 'collection'
+type MenuIcon = 'play' | 'star' | 'star-filled' | 'folder' | 'store' | 'copy' | 'hide' | 'properties' | 'collection' | 'uninstall'
+
+// After an uninstall hand-off: when to rescan the store for the game (about 16 minutes in all).
+const REMOVAL_CHECKS_MS = [20_000, 25_000, 45_000, 90_000, 180_000, 240_000, 360_000]
+const FOCUS_RECHECK_MS = 10_000
+
+const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** A submenu item: a plain action, or a checkbox when `checked` is set. */
 export type MenuCheck = { label: string; checked?: boolean; run: (game: Game) => void } | 'separator'
@@ -43,6 +50,8 @@ export class GameActions extends EventEmitter {
   private readonly library: LibraryService
   private readonly launcher: LaunchService
   private readonly media: MediaService
+  /** Games handed to their store's uninstaller, rescanned for until they're gone. */
+  private readonly pendingRemovals = new Map<string, { name: string; timer: NodeJS.Timeout | null; step: number; lastCheck: number }>()
 
   constructor(library: LibraryService, launcher: LaunchService, media: MediaService) {
     super()
@@ -142,12 +151,88 @@ export class GameActions extends EventEmitter {
   }
 
   /**
+   * Hands a game to its store's own uninstaller, after the user confirms.
+   * Launchbay deletes nothing itself. Afterwards that store is rescanned on a
+   * backoff (and whenever the window regains focus) until the game is gone.
+   */
+  async uninstall(id: string, win: BrowserWindow | null): Promise<void> {
+    const game = this.library.get(id)
+    const handoff = game ? providerFor(game.platform).uninstallHandoff?.(game) : null
+    if (!game || !handoff) return
+    const options = {
+      type: 'warning' as const,
+      title: 'Uninstall',
+      message: `Uninstall ${game.name}?`,
+      detail: `Launchbay doesn’t delete anything itself: it opens ${handoff.via}, which does the uninstalling. ${handoff.steps}\n\nThe game leaves your library once it’s gone.`,
+      buttons: ['Cancel', `Open ${capitalize(handoff.via)}`],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    }
+    const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options)
+    if (response !== 1) return
+    try {
+      if (/^ms-settings:/i.test(handoff.url)) await shell.openExternal(handoff.url)
+      else await openProtocolUrl(handoff.url, capitalize(handoff.via))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      log.warn(`uninstall hand-off for ${id} failed: ${message}`)
+      this.notify({ tone: 'error', title: `Couldn’t open ${handoff.via}`, message })
+      return
+    }
+    log.info(`uninstall of ${id} handed to ${handoff.via}`)
+    this.notify({ tone: 'info', title: `Finish uninstalling in ${handoff.via}`, message: `${game.name} leaves your library once it’s gone.` })
+    this.watchRemoval(id, game.name)
+  }
+
+  /** The window regained focus: the user may be back from the uninstaller, so look now. */
+  onFocus(): void {
+    for (const [id, pending] of this.pendingRemovals) {
+      if (Date.now() - pending.lastCheck > FOCUS_RECHECK_MS) void this.checkRemoval(id)
+    }
+  }
+
+  private watchRemoval(id: string, name: string): void {
+    const existing = this.pendingRemovals.get(id)
+    if (existing?.timer) clearTimeout(existing.timer)
+    this.pendingRemovals.set(id, { name, timer: null, step: 0, lastCheck: Date.now() })
+    this.scheduleRemovalCheck(id)
+  }
+
+  private scheduleRemovalCheck(id: string): void {
+    const pending = this.pendingRemovals.get(id)
+    if (!pending) return
+    const delay = REMOVAL_CHECKS_MS[pending.step]
+    if (delay === undefined) {
+      // Never went away: the uninstall was probably cancelled in the store. Stop looking.
+      this.pendingRemovals.delete(id)
+      return
+    }
+    pending.timer = setTimeout(() => {
+      pending.step++
+      void this.checkRemoval(id).then(() => this.scheduleRemovalCheck(id))
+    }, delay)
+  }
+
+  private async checkRemoval(id: string): Promise<void> {
+    const pending = this.pendingRemovals.get(id)
+    const platform = this.library.stored(id)?.platform
+    if (!pending) return
+    pending.lastCheck = Date.now()
+    if (platform) await this.library.refresh({ manual: false, platforms: [platform] })
+    if (this.library.get(id)) return
+    if (pending.timer) clearTimeout(pending.timer)
+    this.pendingRemovals.delete(id)
+    this.notify({ tone: 'info', title: `${pending.name} was uninstalled`, message: 'It’s no longer on this PC.' })
+  }
+
+  /**
    * The right-click menu for a game. Play and Properties are handed back to
    * the renderer (`toRenderer`), because the launch transition and the sheet
    * live there. Entries a game can't support (a store page that can't be
    * built) are left out rather than shown disabled.
    */
-  menuEntries(game: Game, toRenderer: (action: ContextAction, id: string) => void): MenuEntry[] {
+  menuEntries(game: Game, toRenderer: (action: ContextAction, id: string) => void, win: BrowserWindow | null = null): MenuEntry[] {
     const entries: MenuEntry[] = [
       { label: 'Play', icon: 'play', run: (g) => toRenderer('launch', g.id) },
       game.isFavorite
@@ -173,9 +258,12 @@ export class GameActions extends EventEmitter {
           { label: 'New collection…', run: (g) => toRenderer('new-collection', g.id) }
         ]
       },
-      { label: 'Hide from library', icon: 'hide', run: (g) => this.setHidden(g.id, true) },
-      { label: 'Properties…', icon: 'properties', run: (g) => toRenderer('properties', g.id) }
+      { label: 'Hide from library', icon: 'hide', run: (g) => this.setHidden(g.id, true) }
     )
+    if (providerFor(game.platform).uninstallHandoff?.(game)) {
+      entries.push({ label: 'Uninstall…', icon: 'uninstall', run: (g) => void this.uninstall(g.id, win) })
+    }
+    entries.push({ label: 'Properties…', icon: 'properties', run: (g) => toRenderer('properties', g.id) })
     return entries
   }
 
@@ -188,7 +276,7 @@ export class GameActions extends EventEmitter {
         : item.checked === undefined
           ? { label: item.label, click: () => item.run(game) }
           : { label: item.label, type: 'checkbox', checked: item.checked, click: () => item.run(game) }
-    const template: MenuItemConstructorOptions[] = this.menuEntries(game, toRenderer).map((entry) =>
+    const template: MenuItemConstructorOptions[] = this.menuEntries(game, toRenderer, win).map((entry) =>
       entry === 'separator'
         ? { type: 'separator' }
         : 'submenu' in entry

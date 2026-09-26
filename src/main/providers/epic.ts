@@ -16,5 +16,14 @@ export const epicProvider: GameProvider = {
     return { dirs: [game.installPath] }
   },
 
-  storePageUrl: epicStorePageUrl
+  storePageUrl: epicStorePageUrl,
+
+  // The launcher has no documented uninstall link, so it opens on the library.
+  uninstallHandoff(game) {
+    return {
+      url: 'com.epicgames.launcher://library',
+      via: 'the Epic Games Launcher',
+      steps: `The launcher opens on your library. Find ${game.name} there, open its ⋯ menu and choose Uninstall.`
+    }
+  }
 }

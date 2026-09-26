@@ -150,6 +150,8 @@ async function main(): Promise<void> {
   win.on('minimize', syncVisible)
   win.on('restore', syncVisible)
   syncVisible()
+  // Back from a store's uninstaller: check whether the game is gone.
+  win.on('focus', () => actions.onFocus())
 
   // A game that started after the launch screen gave up still hides Launchbay, if that's the setting.
   launcher.on('late-start', () => {

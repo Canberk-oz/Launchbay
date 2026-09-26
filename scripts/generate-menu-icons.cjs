@@ -21,6 +21,7 @@ const ICONS = {
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
   hide: '<path d="M3 12s3.5-6.5 9-6.5 9 6.5 9 6.5-3.5 6.5-9 6.5S3 12 3 12Z"/><circle cx="12" cy="12" r="2.75"/><path d="m4.5 4.5 15 15"/>',
   properties: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.75v.01"/>',
+  uninstall: '<path d="M4.5 7h15M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7M6.5 7l.8 11.2a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8L17.5 7M10.5 11v5M13.5 11v5"/>',
   collection: '<path d="M4 5.5v5.2a2 2 0 0 0 .6 1.4l7.3 7.3a2 2 0 0 0 2.8 0l4.7-4.7a2 2 0 0 0 0-2.8L12.1 4.6a2 2 0 0 0-1.4-.6H5.5A1.5 1.5 0 0 0 4 5.5Z"/><circle cx="8.5" cy="8.5" r="1.25"/>'
 }
 // Near the menu text colors Windows uses, a touch softer.

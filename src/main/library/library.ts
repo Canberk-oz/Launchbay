@@ -20,6 +20,12 @@ const log = createLogger('library')
 
 const SCAN_TIMEOUT_MS = 90_000
 
+export interface ScanRequest {
+  manual: boolean
+  /** Only these stores (after an uninstall hand-off); every store when omitted. */
+  platforms?: readonly Platform[]
+}
+
 export interface StoredGame extends ScannedGame {
   id: string
   lastScanned: number
@@ -93,7 +99,7 @@ export class LibraryService extends EventEmitter {
   private readonly sizes: SizeService
   private readonly games = new Map<string, StoredGame>()
   private scanning: Promise<void> | null = null
-  private queued: { manual: boolean } | null = null
+  private queued: ScanRequest | null = null
   // Changes not yet sent to the renderer; see drainChanges().
   // Running games (from the process watcher) and when each one's session began.
   private running: ReadonlySet<string> = new Set()
@@ -212,15 +218,21 @@ export class LibraryService extends EventEmitter {
   }
 
   /**
-   * Re-runs every provider. A manual refresh also retries cover and trailer
-   * lookups that failed before. Calls during a scan queue one follow-up scan.
+   * Re-runs every provider, or only `platforms`. A manual refresh also
+   * retries cover and trailer lookups that failed before. Calls during a scan
+   * queue one follow-up scan covering everything they asked for.
    */
-  refresh(opts: { manual: boolean }): Promise<void> {
+  refresh(opts: ScanRequest): Promise<void> {
     if (this.scanning) {
-      this.queued = { manual: opts.manual || (this.queued?.manual ?? false) }
+      const q = this.queued
+      this.queued = {
+        manual: opts.manual || (q?.manual ?? false),
+        // Either request wanting every store means scanning every store.
+        platforms: q && (!q.platforms || !opts.platforms) ? undefined : [...new Set([...(q?.platforms ?? []), ...(opts.platforms ?? [])])]
+      }
       return this.scanning
     }
-    this.scanning = this.runScan(opts.manual).finally(() => {
+    this.scanning = this.runScan(opts.manual, opts.platforms).finally(() => {
       this.scanning = null
       this.emit('scan-status', this.scanStatus())
       const next = this.queued
@@ -231,19 +243,18 @@ export class LibraryService extends EventEmitter {
     return this.scanning
   }
 
-  private async runScan(manual: boolean): Promise<void> {
+  private async runScan(manual: boolean, platforms?: readonly Platform[]): Promise<void> {
     const started = Date.now()
-    const results = await Promise.allSettled(
-      this.providers.map((p) => withTimeout(p.scan(), SCAN_TIMEOUT_MS, p.label))
-    )
+    const scanned = platforms ? this.providers.filter((p) => platforms.includes(p.platform)) : this.providers
+    const results = await Promise.allSettled(scanned.map((p) => withTimeout(p.scan(), SCAN_TIMEOUT_MS, p.label)))
     const now = Date.now()
     const arrived: StoredGame[] = []
 
     results.forEach((result, index) => {
-      const platform: Platform = this.providers[index].platform
+      const platform: Platform = scanned[index].platform
       if (result.status === 'rejected') {
         // Keep the last known games for this platform rather than dropping them.
-        log.error(`${this.providers[index].label} scan failed`, result.reason)
+        log.error(`${scanned[index].label} scan failed`, result.reason)
         return
       }
       const previous = new Map([...this.games].filter(([, g]) => g.platform === platform))
@@ -263,7 +274,7 @@ export class LibraryService extends EventEmitter {
         this.removed.add(id)
         this.forgetAddedAt(id)
       }
-      log.info(`${this.providers[index].label}: ${result.value.length} game(s)`)
+      log.info(`${scanned[index].label}: ${result.value.length} game(s)`)
     })
 
     await this.recordArrivals(arrived, now)

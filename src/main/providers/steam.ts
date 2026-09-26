@@ -32,6 +32,15 @@ export const steamProvider: GameProvider = {
     return root ? findScreenshots(root, game.platformId) : []
   },
 
+  uninstallHandoff(game) {
+    if (!/^\d+$/.test(game.platformId)) return null
+    return {
+      url: `steam://uninstall/${game.platformId}`,
+      via: 'Steam',
+      steps: 'Steam asks you to confirm, then removes the game.'
+    }
+  },
+
   storePageUrl(game) {
     return /^\d+$/.test(game.platformId) ? `steam://store/${game.platformId}` : null
   }

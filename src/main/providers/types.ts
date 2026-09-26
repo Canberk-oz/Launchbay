@@ -57,6 +57,19 @@ export interface ScreenshotFile {
   takenAt: number
 }
 
+/**
+ * Where a game is uninstalled: the store's own flow, which Launchbay only
+ * opens. Launchbay never deletes game files or removes packages itself.
+ */
+export interface UninstallHandoff {
+  /** Opened after the user confirms. */
+  url: string
+  /** Who does the uninstalling, e.g. "Steam", "Windows Settings". */
+  via: string
+  /** What happens next, in a sentence or two for the confirmation dialog. */
+  steps: string
+}
+
 export interface LaunchWatch {
   /** A process whose image lies under one of these folders means the game started. */
   dirs: string[]
@@ -96,6 +109,9 @@ export interface GameProvider {
    * be built for this game (the menu then leaves the item out).
    */
   storePageUrl?(game: Pick<ScannedGame, 'platformId' | 'storeRef'>): string | null
+
+  /** Optional capability: how to hand an uninstall to the store. */
+  uninstallHandoff?(game: Game): UninstallHandoff | null
 
   /** Optional capability: screenshots the store keeps locally, newest first. */
   screenshots?(game: Game): Promise<ScreenshotFile[]>
