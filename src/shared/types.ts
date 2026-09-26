@@ -151,6 +151,13 @@ export interface InitialState {
 /** `overlay`: summoned by the global hotkey; `show`: opened normally (tray, second launch). */
 export type WindowVisibility = 'show' | 'overlay' | 'hide'
 
+/** A message from the main process for the renderer to show as a toast. */
+export interface Notice {
+  tone: 'error' | 'warning' | 'info'
+  title: string
+  message?: string
+}
+
 /** Right-click menu picks the renderer carries out (they start UI there). */
 export type ContextAction = 'launch' | 'properties'
 

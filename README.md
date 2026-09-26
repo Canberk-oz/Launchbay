@@ -23,6 +23,7 @@ npm run dev          # run with hot reload
 | `npm run typecheck` | Type-checks the main, preload and renderer code |
 | `npm run scan:diagnose` | Runs the three platform scanners without Electron and prints what they find |
 | `npm run icons` | Regenerates the app and tray icons (they are drawn procedurally) |
+| `npm run icons:menu` | Regenerates the right-click menu icons in `resources/menu` from the app's stroke icon family |
 
 > Electron 44 downloads its binary on first run rather than at install time. If that is blocked, run `npx install-electron`.
 > The installer is unsigned, so Windows SmartScreen will ask for confirmation the first time.
@@ -34,7 +35,8 @@ npm run dev          # run with hot reload
 - **Trailer preview (Steam):** keep the pointer on a cover. A yellow hairline fills for 800 ms, then a muted, looping trailer crossfades in.
 - **Launch:** click a cover. It lifts off the shelf, fills the window and blurs while the store's launcher starts the game. The view returns to the grid once the game is detected, after about 9 seconds without a detection, or immediately with an error on the tile if the hand-off fails.
 - **Overlay:** **Ctrl+Shift+G** (configurable) shows Launchbay centered and on top of whatever you're doing, with the cursor already in search. Type, press **Enter** to play the top match, and press the hotkey or Esc to hide it again. Closing the window keeps Launchbay in the tray, so the hotkey still works.
-- **Right-click a game:** Play, Add/Remove favorite, Open install folder, Hide from library. Hidden games can be restored from Settings.
+- **Right-click a game:** Play, Add/Remove favorite, Open install folder, Open store page, Copy launch command, Hide from library, Properties…. Open store page appears only when the page can be built: always for Steam and Xbox, and for Epic when the launcher's catalog cache has the game's product slug. Hidden games can be restored from Settings.
+- **Properties (Alt+Enter):** a read-only sheet with the game's size, playtime, last played, date added, update status, install folder, launch command, IDs and cover source.
 
 | Key | Action |
 | --- | --- |
@@ -44,6 +46,7 @@ npm run dev          # run with hot reload
 | ↓ from search, arrow keys | Move between games |
 | Enter / Space | Launch the focused game |
 | F | Toggle favorite on the focused game |
+| Alt+Enter | Properties of the focused game |
 | Ctrl + / Ctrl − | Larger or smaller tiles |
 | F5 / Ctrl+R | Refresh the library |
 | Ctrl+, | Settings |

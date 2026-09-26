@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
     "test": "node --import ./tests/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/**/*.test.ts\"",
     "icons": "node scripts/generate-icons.mjs",
+    "icons:menu": "electron scripts/generate-menu-icons.cjs",
     "dist": "npm run build && electron-builder --win --x64",
     "dist:dir": "npm run build && electron-builder --win --x64 --dir",
     "scan:diagnose": "node --import ./tests/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scan-diagnostics.ts"

@@ -101,6 +101,8 @@ async function main(): Promise<void> {
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
   }
 
+  actions.on('notice', (notice) => send(IPC.notice, notice))
+
   registerIpc({ library, media, settings, hotkeys, actions, windows, isPackaged: app.isPackaged, startHidden })
 
   library.on(

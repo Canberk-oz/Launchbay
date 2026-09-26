@@ -32,7 +32,8 @@ const api: LaunchbayApi = {
   onHotkeyStatus: (cb) => subscribe(IPC.hotkeyStatus, cb),
   onWindowVisibility: (cb) => subscribe(IPC.windowVisibility, cb),
   onContextAction: (cb) => subscribe(IPC.contextAction, cb),
-  onOpenSettings: (cb) => subscribe(IPC.openSettings, () => cb())
+  onOpenSettings: (cb) => subscribe(IPC.openSettings, () => cb()),
+  onNotice: (cb) => subscribe(IPC.notice, cb)
 }
 
 contextBridge.exposeInMainWorld('launchbay', api)

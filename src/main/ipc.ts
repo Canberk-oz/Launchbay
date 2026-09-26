@@ -53,7 +53,7 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.showContextMenu, (event: IpcMainInvokeEvent, id: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
-    actions.showMenu(asString(id), win, (gameId) => event.sender.send(IPC.contextAction, { action: 'launch', id: gameId }))
+    actions.showMenu(asString(id), win, (action, gameId) => event.sender.send(IPC.contextAction, { action, id: gameId }))
   })
 
   ipcMain.handle(IPC.updateSettings, (_e, patch: unknown) => {

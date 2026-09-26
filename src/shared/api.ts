@@ -7,6 +7,7 @@ import type {
   LibraryPatch,
   LaunchResult,
   MediaCacheInfo,
+  Notice,
   ScanStatus,
   Settings,
   WindowVisibility
@@ -38,4 +39,5 @@ export interface LaunchbayApi {
   onWindowVisibility(cb: (visibility: WindowVisibility) => void): Unsubscribe
   onContextAction(cb: (action: { action: ContextAction; id: string }) => void): Unsubscribe
   onOpenSettings(cb: () => void): Unsubscribe
+  onNotice(cb: (notice: Notice) => void): Unsubscribe
 }

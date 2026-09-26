@@ -30,6 +30,7 @@ function useMainProcessEvents(setAnim: (a: 'in' | 'out' | null) => void): void {
       api.onSettingsChanged((settings) => useStore.setState({ settings: { ...settings, ...pendingSettings() } })),
       api.onHotkeyStatus((hotkey) => useStore.setState({ hotkey })),
       api.onOpenSettings(() => openSettings()),
+      api.onNotice((notice) => pushToast(notice, notice.tone === 'error' ? 8000 : 3200)),
       api.onContextAction(({ action, id }) => {
         if (action === 'properties') return openProperties(id)
         const game = useStore.getState().games.find((g) => g.id === id)

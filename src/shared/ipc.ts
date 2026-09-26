@@ -25,5 +25,6 @@ export const IPC = {
   hotkeyStatus: 'hotkey:status',
   windowVisibility: 'window:visibility',
   contextAction: 'game:context-action',
-  openSettings: 'app:open-settings'
+  openSettings: 'app:open-settings',
+  notice: 'app:notice'
 } as const
