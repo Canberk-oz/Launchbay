@@ -1,0 +1,29 @@
+appId: com.launchbay.app
+productName: Launchbay
+copyright: Launchbay
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+  - package.json
+# Tray and window icons are read from process.resourcesPath at runtime.
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - "*.png"
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Launchbay

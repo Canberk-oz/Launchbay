@@ -1,0 +1,212 @@
+/* Back of the Box: the chrome is set like the spec block on a PC game box.
+   Achromatic shell, one sticker-yellow accent, Archivo condensed caps for
+   labels, tabular figures everywhere, hairline rules. */
+
+:root {
+  color-scheme: dark;
+
+  --ground: #0d0d0f;
+  --layer: #151518;
+  --layer-2: #1c1c21;
+  --layer-3: #26262c;
+  --rule: rgb(236 235 230 / 0.08);
+  --rule-2: rgb(236 235 230 / 0.14);
+  --rule-3: rgb(236 235 230 / 0.24);
+
+  --ink: #ecebe6;
+  --ink-2: #8f8f98;
+  --ink-3: #6b6b73;
+
+  --accent: #ffcc33;
+  --accent-ink: #1a1405;
+  --accent-soft: rgb(255 204 51 / 0.12);
+  --danger: #ff6b5b;
+  --danger-ink: #2a0b07;
+  --danger-soft: rgb(255 107 91 / 0.12);
+  --paper-bright: #ffffff;
+  --paper-pressed: #d9d8d2;
+  --accent-bright: #ffd75c;
+  /* The printed edge of a box: a white hairline inside the art. */
+  --print-edge: rgb(255 255 255 / 0.08);
+  --print-edge-strong: rgb(255 255 255 / 0.12);
+  --shadow-ink: rgb(0 0 0 / 0.6);
+
+  --steam-1: #2a475e;
+  --steam-2: #1b2838;
+  --steam-3: #10161f;
+  --steam-hi: #66c0f4;
+  --epic-1: #3a3a41;
+  --epic-2: #1e1e22;
+  --epic-3: #0f0f11;
+  --epic-hi: #f2f2f2;
+  --xbox-1: #1c8a1c;
+  --xbox-2: #0f5a10;
+  --xbox-3: #082b09;
+  --xbox-hi: #b6f15a;
+
+  /* The tile gutter is the base unit; the page edge is one and a half. */
+  --unit: 16px;
+  --edge: 24px;
+  --radius-tile: 6px;
+  --radius-ctl: 8px;
+  --radius-frame: 3px;
+  --radius-badge: 5px;
+  --text-micro: 10px;
+  --titlebar-h: 44px;
+  --toolbar-h: 48px;
+
+  --font: 'Archivo Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.55, 0, 0.8, 0.2);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums lining-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+input,
+textarea {
+  user-select: text;
+  caret-color: var(--accent);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(236 235 230 / 0.13);
+  border-radius: 8px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(236 235 230 / 0.24);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Spec-block label: condensed caps, tracked, tabular. */
+.spec {
+  font-stretch: 72%;
+  font-weight: 650;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Drawn keycap, as on a keyboard reference card. */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--layer-2);
+  box-shadow:
+    inset 0 0 0 1px var(--rule-2),
+    inset 0 -2px 0 rgb(0 0 0 / 0.45);
+  color: var(--ink-2);
+  /* <kbd> defaults to monospace; keycaps are set in the UI face. */
+  font-family: var(--font);
+  font-stretch: 80%;
+  font-weight: 650;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.kbd-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.kbd--lg {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 9px;
+  font-size: 13px;
+  border-radius: 6px;
+  color: var(--ink);
+  box-shadow:
+    inset 0 0 0 1px var(--rule-3),
+    inset 0 -3px 0 rgb(0 0 0 / 0.5);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

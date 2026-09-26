@@ -1,0 +1,37 @@
+{
+  "name": "launchbay",
+  "productName": "Launchbay",
+  "version": "0.1.0",
+  "description": "Unified game library launcher for Steam, Epic Games and Xbox",
+  "private": true,
+  "main": "./out/main/index.js",
+  "author": "Launchbay",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
+    "test": "node --import ./tests/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/**/*.test.ts\"",
+    "icons": "node scripts/generate-icons.mjs",
+    "dist": "npm run build && electron-builder --win --x64",
+    "dist:dir": "npm run build && electron-builder --win --x64 --dir",
+    "scan:diagnose": "node --import ./tests/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/scan-diagnostics.ts"
+  },
+  "devDependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@tanstack/react-virtual": "^3.14.13",
+    "@types/node": "^22.20.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "fast-xml-parser": "^5.11.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "zustand": "^5.0.15"
+  }
+}

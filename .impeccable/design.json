@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-23T18:30:00.000Z",
+  "title": "Design System: Launchbay",
+  "extensions": {
+    "colorMeta": {
+      "shelf-black": { "role": "neutral", "displayName": "Shelf Black", "canonical": "oklch(16.0% 0.004 285.9)", "tonalRamp": ["#0b0b0d", "#252527", "#424244", "#616163", "#828285", "#a5a5a8", "#c9c9cc", "#eeeef1"] },
+      "box-paper": { "role": "neutral", "displayName": "Box Paper", "canonical": "oklch(93.9% 0.007 97.4)", "tonalRamp": ["#0c0b08", "#262521", "#43423e", "#62615d", "#83827e", "#a6a5a0", "#cac9c4", "#f0eee9"] },
+      "spec-gray": { "role": "neutral", "displayName": "Spec Gray", "canonical": "oklch(65.3% 0.013 286.0)", "tonalRamp": ["#0b0a11", "#24242b", "#414149", "#606069", "#81818a", "#a4a4ad", "#c8c8d2", "#ededf7"] },
+      "sticker-yellow": { "role": "primary", "displayName": "Sticker Yellow", "canonical": "oklch(86.7% 0.165 88.7)", "tonalRamp": ["#110a00", "#302300", "#533f01", "#785d00", "#a07d06", "#ca9f05", "#f5c221", "#ffedc2"] },
+      "recall-red": { "role": "tertiary", "displayName": "Recall Red", "canonical": "oklch(70.9% 0.184 28.7)", "tonalRamp": ["#210000", "#4e0000", "#810002", "#b21e17", "#da493c", "#fe7464", "#feb3a8", "#fee9e6"] },
+      "steam-slate": { "role": "tertiary", "displayName": "Steam Slate (box fronts only)", "canonical": "oklch(27.3% 0.035 254.1)", "tonalRamp": ["#020b19", "#192636", "#354354", "#546375", "#748497", "#96a7bb", "#bacbe0", "#e4f0fe"] },
+      "epic-graphite": { "role": "tertiary", "displayName": "Epic Graphite (box fronts only)", "canonical": "oklch(23.7% 0.008 285.8)", "tonalRamp": ["#0b0b0e", "#252529", "#414146", "#616165", "#828287", "#a4a4aa", "#c8c8ce", "#eeeef3"] },
+      "xbox-green": { "role": "tertiary", "displayName": "Xbox Green (box fronts only)", "canonical": "oklch(40.9% 0.127 142.9)", "tonalRamp": ["#001000", "#002f00", "#005104", "#2d732b", "#50954d", "#73b96f", "#97de92", "#cbffc7"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The game's name during the launch transition." },
+      "headline": { "displayName": "Headline", "purpose": "Empty-state titles and the settings sheet title." },
+      "title": { "displayName": "Title", "purpose": "Game names in list rows and tile captions." },
+      "body": { "displayName": "Body", "purpose": "Controls, settings copy, notices; tabular lining figures." },
+      "label": { "displayName": "Spec Label", "purpose": "Condensed caps for section heads, column heads, meta lines and spec-table keys." },
+      "box-type": { "displayName": "Box Type", "purpose": "Titles printed on box fronts (missing art, transparent logos)." },
+      "wordmark": { "displayName": "Wordmark", "purpose": "LAUNCHBAY in the title strip." }
+    },
+    "shadows": [
+      { "name": "tile-rest", "value": "0 1px 2px rgb(0 0 0 / 0.45), 0 10px 22px -14px rgb(0 0 0 / 0.8)", "purpose": "A cover sitting on the shelf." },
+      { "name": "tile-lifted", "value": "0 3px 6px rgb(0 0 0 / 0.5), 0 26px 48px -18px rgb(0 0 0 / 0.9)", "purpose": "Hover, keyboard focus and preview, with scale(1.05)." },
+      { "name": "sticker", "value": "0 2px 6px rgb(0 0 0 / 0.5), inset 0 -2px 0 rgb(0 0 0 / 0.12)", "purpose": "The favorite sticker on the shrinkwrap." },
+      { "name": "sheet-edge", "value": "-1px 0 0 rgb(236 235 230 / 0.14), -24px 0 60px -20px rgb(0 0 0 / 0.8)", "purpose": "The settings sheet over the shelf." },
+      { "name": "notice", "value": "inset 0 0 0 1px rgb(236 235 230 / 0.14), 0 18px 40px -12px rgb(0 0 0 / 0.8)", "purpose": "Boxed notices." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Routine state changes: tile lift (180ms), captions, sheet (220ms)." },
+      { "name": "ease-in", "value": "cubic-bezier(0.55, 0, 0.8, 0.2)", "purpose": "Exits: launch fade-back (320ms), overlay dismiss (140ms)." },
+      { "name": "launch-lift", "value": "520ms cubic-bezier(0.25, 0.8, 0.2, 1)", "purpose": "The cover's FLIP from tile to full window, blurring and dimming." },
+      { "name": "preview-arm", "value": "800ms linear", "purpose": "The armed hairline filling while a hover waits to start a trailer." }
+    ],
+    "breakpoints": [
+      { "name": "list-compact", "value": "980px" },
+      { "name": "brand-compact", "value": "960px" },
+      { "name": "toolbar-compact", "value": "900px" },
+      { "name": "window-min", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Paper-white action (Change, Show all games).",
+      "html": "<button class=\"ds-btn-primary\">Show all games</button>",
+      "css": ".ds-btn-primary { height: 28px; padding: 0 11px; border: 0; border-radius: 8px; background: #ecebe6; color: #0d0d0f; font: 600 12.5px/1 'Archivo Variable', 'Segoe UI', sans-serif; cursor: pointer; transition: background 120ms; } .ds-btn-primary:hover { background: #ffffff; } .ds-btn-primary:active { background: #d9d8d2; } .ds-btn-primary:focus-visible { outline: 2px solid #ffcc33; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Hairline-outlined quiet action (Refresh library, Cancel).",
+      "html": "<button class=\"ds-btn\">Refresh library</button>",
+      "css": ".ds-btn { height: 28px; padding: 0 11px; border: 0; border-radius: 8px; background: transparent; color: #ecebe6; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.14); font: 600 12.5px/1 'Archivo Variable', 'Segoe UI', sans-serif; cursor: pointer; transition: background 120ms, box-shadow 120ms; } .ds-btn:hover { background: #1c1c21; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.24); } .ds-btn:active { background: #26262c; } .ds-btn:focus-visible { outline: 2px solid #ffcc33; outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Pill",
+      "kind": "chip",
+      "refersTo": "filter-pill",
+      "description": "Capsule filter with a count chip that inverts when active; an empty store shows as a dashed ghost.",
+      "html": "<div class=\"ds-pills\"><button class=\"ds-pill is-active\">All <span class=\"ds-count\">6</span></button><button class=\"ds-pill\">Steam <span class=\"ds-count\">4</span></button><button class=\"ds-pill is-empty\">Epic <span class=\"ds-count\">0</span></button></div>",
+      "css": ".ds-pills { display: flex; gap: 8px; background: #0d0d0f; padding: 12px; } .ds-pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 4px 0 11px; border: 0; border-radius: 999px; background: transparent; color: #ecebe6; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.14); font: 600 12.5px/1 'Archivo Variable', 'Segoe UI', sans-serif; cursor: pointer; } .ds-pill:hover { background: #1c1c21; } .ds-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #1c1c21; color: #8f8f98; font-size: 11px; font-weight: 700; font-stretch: 75%; } .ds-pill.is-active { background: #ecebe6; color: #0d0d0f; box-shadow: none; } .ds-pill.is-active .ds-count { background: #0d0d0f; color: #ecebe6; } .ds-pill.is-empty { color: #8f8f98; box-shadow: none; outline: 1px dashed rgb(236 235 230 / 0.14); outline-offset: -1px; } .ds-pill.is-empty .ds-count { background: none; color: #6b6b73; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "Title-strip search with its Ctrl F keycaps.",
+      "html": "<label class=\"ds-search\"><input placeholder=\"Search 6 games\" /><span class=\"ds-keys\"><kbd class=\"ds-kbd\">Ctrl</kbd><kbd class=\"ds-kbd\">F</kbd></span></label>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 8px; width: 360px; height: 30px; padding: 0 6px 0 10px; border-radius: 8px; background: #151518; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.08); } .ds-search:focus-within { background: #1c1c21; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.24), 0 0 0 3px rgb(255 204 51 / 0.12); } .ds-search input { flex: 1; min-width: 0; border: 0; background: none; color: #ecebe6; font: 13px 'Archivo Variable', 'Segoe UI', sans-serif; caret-color: #ffcc33; outline: none; } .ds-search input::placeholder { color: #8f8f98; } .ds-keys { display: inline-flex; gap: 3px; } .ds-kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 4px; background: #1c1c21; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.14), inset 0 -2px 0 rgb(0 0 0 / 0.45); color: #8f8f98; font: 650 10.5px/1 'Archivo Variable', sans-serif; font-stretch: 80%; letter-spacing: 0.04em; }"
+    },
+    {
+      "name": "Spec Section Head",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Condensed-caps title, a hairline to the edge, and the count.",
+      "html": "<div class=\"ds-head\"><h2>Favorites</h2><span class=\"ds-rule\"></span><span class=\"ds-n\">2 games</span></div>",
+      "css": ".ds-head { display: flex; align-items: center; gap: 12px; padding: 16px; background: #0d0d0f; font: 650 11px/1 'Archivo Variable', sans-serif; font-stretch: 72%; letter-spacing: 0.09em; text-transform: uppercase; } .ds-head h2 { margin: 0; font: inherit; font-weight: 750; color: #ecebe6; } .ds-rule { flex: 1; height: 1px; background: rgb(236 235 230 / 0.14); } .ds-n { color: #8f8f98; }"
+    },
+    {
+      "name": "Favorite Sticker",
+      "kind": "custom",
+      "refersTo": "favorite-sticker",
+      "description": "The shrinkwrap sticker: appears on hover, stays filled once the game is a favorite.",
+      "html": "<div class=\"ds-stickers\"><button class=\"ds-sticker\" aria-label=\"Add to favorites\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"m12 3.6 2.55 5.3 5.8.78-4.23 4.02 1.05 5.75L12 16.7l-5.17 2.75 1.05-5.75L3.65 9.68l5.8-.78Z\"/></svg></button><button class=\"ds-sticker is-on\" aria-label=\"Remove from favorites\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"><path d=\"m12 3.6 2.55 5.3 5.8.78-4.23 4.02 1.05 5.75L12 16.7l-5.17 2.75 1.05-5.75L3.65 9.68l5.8-.78Z\"/></svg></button></div>",
+      "css": ".ds-stickers { display: flex; gap: 12px; padding: 16px; background: #2a475e; } .ds-sticker { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgb(13 13 15 / 0.78); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12); color: #ecebe6; cursor: pointer; transition: background 140ms, color 140ms; } .ds-sticker:hover { background: rgb(13 13 15 / 0.92); color: #ffcc33; } .ds-sticker.is-on { background: #ffcc33; color: #1a1405; box-shadow: 0 2px 6px rgb(0 0 0 / 0.5), inset 0 -2px 0 rgb(0 0 0 / 0.12); } .ds-sticker:focus-visible { outline: 2px solid #ffcc33; outline-offset: 2px; }"
+    },
+    {
+      "name": "Box Front",
+      "kind": "card",
+      "refersTo": "game-tile",
+      "description": "The printed fallback tile for missing art: platform gradient, inset frame, mark, Box Type title.",
+      "html": "<div class=\"ds-box\"><span class=\"ds-frame\"></span><span class=\"ds-mark\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9.2\"/><path d=\"M6.6 6.2C9.3 8.3 11 10.4 12 12c1-1.6 2.7-3.7 5.4-5.8M6.6 17.8C9.3 15.7 11 13.6 12 12c1 1.6 2.7 3.7 5.4 5.8\"/></svg></span><span class=\"ds-title\">Solitaire &amp; Casual Games</span><span class=\"ds-plat\">Xbox</span></div>",
+      "css": ".ds-box { position: relative; width: 184px; aspect-ratio: 2 / 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 22px; border-radius: 6px; overflow: hidden; text-align: center; background: radial-gradient(120% 70% at 50% 0%, rgb(255 255 255 / 0.1), transparent 60%), linear-gradient(165deg, #1c8a1c, #0f5a10 55%, #082b09); box-shadow: 0 1px 2px rgb(0 0 0 / 0.45), 0 10px 22px -14px rgb(0 0 0 / 0.8); transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-box:hover { transform: scale(1.05); } .ds-frame { position: absolute; inset: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.13); } .ds-mark { display: grid; color: #b6f15a; } .ds-title { color: #ecebe6; font: 850 21px/1.02 'Archivo Variable', sans-serif; font-stretch: 80%; text-transform: uppercase; text-wrap: balance; } .ds-plat { position: absolute; bottom: 16px; color: rgb(236 235 230 / 0.66); font: 650 10px/1 'Archivo Variable', sans-serif; font-stretch: 72%; letter-spacing: 0.09em; text-transform: uppercase; }"
+    },
+    {
+      "name": "Notice",
+      "kind": "custom",
+      "refersTo": "notice",
+      "description": "Boxed notice; errors take a Recall Red edge.",
+      "html": "<div class=\"ds-notice is-error\"><strong>Couldn’t launch Forager</strong><span>The Xbox app didn’t respond. Try again.</span></div>",
+      "css": ".ds-notice { display: grid; gap: 3px; width: 380px; padding: 12px 14px; border-radius: 10px; background: #1c1c21; box-shadow: inset 0 0 0 1px rgb(236 235 230 / 0.14), 0 18px 40px -12px rgb(0 0 0 / 0.8); font-family: 'Archivo Variable', 'Segoe UI', sans-serif; } .ds-notice strong { color: #ecebe6; font-size: 13px; font-weight: 650; } .ds-notice span { color: #8f8f98; font-size: 12px; line-height: 1.45; } .ds-notice.is-error { box-shadow: inset 0 0 0 1px rgb(255 107 91 / 0.4), 0 18px 40px -12px rgb(0 0 0 / 0.8); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Back of the Box",
+    "overview": "Launchbay treats every installed game the way a retail shelf did: covers face out, big and uncropped, and the chrome around them is set like the spec block printed on the back of a boxed PC game (condensed caps, hairline rules, tabular figures, drawn keycaps). The covers carry all the color and drama. The shell stays near-black, quiet and exact, so a wall of dark cover art pops rather than competing with a themed frame.\n\nThe system is dense where people scan (the list view reads like a system-requirements table) and generous where people browse (the cover wall, the launch lift-off). Motion is feedback, apart from one authored moment: on launch the cover lifts off the shelf and grows to fill the window, blurred and dimmed, while a disc spins up.\n\nIt refuses the category defaults of slate panels, a left rail and blue selection, and of the neon-glow gaming dashboard. It also stays clear of retro costume: no barcodes, rating-box pastiche or fake shrinkwrap gloss. The discipline is type and rules, not props.",
+    "keyCharacteristics": [
+      "Near-black shelf, colorless chrome, one sticker-yellow accent.",
+      "Archivo from a single variable family: condensed caps for every label, normal width for game names.",
+      "Hairline-ruled spec headers with right-aligned counts divide the shelf.",
+      "Face-out 2:3 covers that lift on hover; transparent logos and missing art become printed box fronts.",
+      "Drawn keycaps for every keyboard hint."
+    ],
+    "rules": [
+      { "name": "The One Sticker Rule", "body": "Sticker Yellow marks favorites, focus, the primary-action hint and \"on\" states. It is never decoration, never a fill for a region, and never used for a second meaning.", "section": "colors" },
+      { "name": "The Colorless Shell Rule", "body": "The chrome carries no hue of its own. Color comes from the covers and from platform box fronts, never from panels, headers or borders.", "section": "colors" },
+      { "name": "The Spec Label Rule", "body": "Every label, head, column title and meta line uses condensed caps. Game names never do; a name is set at normal width so it reads as content, not chrome.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Figures are tabular and lining everywhere (counts, sizes, playtime), so columns and chips never jitter.", "section": "typography" },
+      { "name": "The Lift-Off Rule", "body": "Depth answers state. Nothing floats at rest except the covers, and a cover lifts only when it is hovered, focused or previewing.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the ground at Shelf Black (#0d0d0f) and let the covers supply color.",
+      "Do set every label, head and meta line as condensed caps (Archivo, 72% width, +0.09em) and every game name at normal width.",
+      "Do draw keyboard hints as keycaps, in Archivo, never as bare text.",
+      "Do print a box front (platform gradient, frame, Box Type title) wherever art is missing, instead of leaving a blank or broken image.",
+      "Do keep routine motion at 140–220ms ease-out and save the long, authored motion for the launch.",
+      "Do use the 16px gutter as the unit and 24px for the page edge."
+    ],
+    "donts": [
+      "Don't introduce a second accent hue; Sticker Yellow is the only one, and Recall Red is reserved for failure.",
+      "Don't add barcodes, rating-box pastiche, faux shrinkwrap gloss or other box props; the world is carried by type and rules.",
+      "Don't reach for slate panels, a left rail or blue selection (the category default), or for neon glow.",
+      "Don't set game names in condensed caps, or labels in normal width.",
+      "Don't use monospace for keycaps or numbers; tabular Archivo covers both.",
+      "Don't put a kicker or eyebrow above a heading; spec heads carry their own weight."
+    ]
+  }
+}
