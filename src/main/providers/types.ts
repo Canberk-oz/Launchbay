@@ -31,6 +31,8 @@ export interface ScannedGame {
    * no local record of it (Epic, Xbox), which is "unknown", not "up to date".
    */
   updateAvailable: boolean | null
+  /** An id the provider needs to build its store page beyond `platformId` (Epic's product slug). */
+  storeRef?: string
   coverSources: CoverSource[]
 }
 
@@ -73,4 +75,10 @@ export interface GameProvider {
 
   /** Optional capability: how to recognise that the game is actually running. */
   launchWatch?(game: Game): LaunchWatch
+
+  /**
+   * Optional capability: the game's page in its store, or null when it can't
+   * be built for this game (the menu then leaves the item out).
+   */
+  storePageUrl?(game: Pick<ScannedGame, 'platformId' | 'storeRef'>): string | null
 }

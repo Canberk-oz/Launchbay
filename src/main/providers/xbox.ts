@@ -18,5 +18,9 @@ export const xboxProvider: GameProvider = {
 
   launchWatch(game) {
     return { dirs: [game.installPath] }
+  },
+
+  storePageUrl(game) {
+    return `ms-windows-store://pdp/?PFN=${encodeURIComponent(game.platformId)}`
   }
 }

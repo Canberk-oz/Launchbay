@@ -25,5 +25,9 @@ export const steamProvider: GameProvider = {
 
   launchWatch(game) {
     return { dirs: [game.installPath], steamAppId: game.platformId }
+  },
+
+  storePageUrl(game) {
+    return /^\d+$/.test(game.platformId) ? `steam://store/${game.platformId}` : null
   }
 }

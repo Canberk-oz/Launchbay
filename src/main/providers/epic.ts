@@ -1,5 +1,5 @@
 import { openProtocolUrl } from './launchers'
-import { scanEpic } from './epicScan'
+import { epicStorePageUrl, scanEpic } from './epicScan'
 import type { GameProvider } from './types'
 
 export const epicProvider: GameProvider = {
@@ -14,5 +14,7 @@ export const epicProvider: GameProvider = {
 
   launchWatch(game) {
     return { dirs: [game.installPath] }
-  }
+  },
+
+  storePageUrl: epicStorePageUrl
 }

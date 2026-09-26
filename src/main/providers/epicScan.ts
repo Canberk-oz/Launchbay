@@ -79,19 +79,51 @@ export function rankKeyImages(images: KeyImage[]): string[] {
     .map((img) => img.url!)
 }
 
+export interface CatalogEntry {
+  keyImages: KeyImage[]
+  /** The store page path under store.epicgames.com/p/, when the item carries one. */
+  productSlug?: string
+}
+
+interface CatalogItem {
+  id?: string
+  keyImages?: KeyImage[]
+  productSlug?: unknown
+  customAttributes?: Record<string, { value?: unknown } | undefined>
+}
+
+/** Pure: a product slug fit for a store URL ("fortnite/home" becomes "fortnite"), or undefined. */
+export function cleanProductSlug(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const slug = value.trim().replace(/\/home$/i, '')
+  return /^[a-z0-9][a-z0-9-]*$/i.test(slug) ? slug : undefined
+}
+
 /**
  * Pure: the launcher's catalog cache (Data/Catalog/catcache.bin) is a base64
  * JSON array of catalog items. It is local data the launcher already fetched,
  * and its key images point at Epic's public CDN, so no sign-in is involved.
  */
-export function parseCatalogCache(raw: string): Map<string, KeyImage[]> {
-  const byItemId = new Map<string, KeyImage[]>()
+export function parseCatalogCache(raw: string): Map<string, CatalogEntry> {
+  const byItemId = new Map<string, CatalogEntry>()
   const json = JSON.parse(Buffer.from(raw.trim(), 'base64').toString('utf8')) as unknown
   if (!Array.isArray(json)) return byItemId
-  for (const item of json as Array<{ id?: string; keyImages?: KeyImage[] }>) {
-    if (item?.id && Array.isArray(item.keyImages)) byItemId.set(item.id, item.keyImages)
+  for (const item of json as CatalogItem[]) {
+    if (!item?.id) continue
+    const productSlug =
+      cleanProductSlug(item.customAttributes?.['com.epicgames.app.productSlug']?.value) ?? cleanProductSlug(item.productSlug)
+    byItemId.set(item.id, {
+      keyImages: Array.isArray(item.keyImages) ? item.keyImages : [],
+      ...(productSlug ? { productSlug } : {})
+    })
   }
   return byItemId
+}
+
+/** Pure: the store page for a game whose catalog entry had a slug. */
+export function epicStorePageUrl(game: { storeRef?: string }): string | null {
+  const slug = cleanProductSlug(game.storeRef)
+  return slug ? `https://store.epicgames.com/p/${slug}` : null
 }
 
 /** What `findEpicDataDir` reads from the machine; replaced in tests. */
@@ -135,7 +167,7 @@ export async function scanEpic(env: EpicLocator = machine()): Promise<ScannedGam
   // The folder was there a moment ago, so a failure here is an error, not "no games".
   const files = (await fs.readdir(manifestsDir)).filter((f) => f.toLowerCase().endsWith('.item'))
 
-  let catalog = new Map<string, KeyImage[]>()
+  let catalog = new Map<string, CatalogEntry>()
   try {
     catalog = parseCatalogCache(await fs.readFile(join(dataDir, 'Catalog', 'catcache.bin'), 'utf8'))
   } catch {
@@ -156,7 +188,7 @@ export async function scanEpic(env: EpicLocator = machine()): Promise<ScannedGam
       if (!(await isDirectory(installPath))) return
 
       const appName = manifest.AppName!
-      const catalogImages = manifest.CatalogItemId ? (catalog.get(manifest.CatalogItemId) ?? []) : []
+      const entry = manifest.CatalogItemId ? catalog.get(manifest.CatalogItemId) : undefined
       games.set(appName, {
         platform: 'epic',
         platformId: appName,
@@ -167,9 +199,10 @@ export async function scanEpic(env: EpicLocator = machine()): Promise<ScannedGam
         playtimeMinutes: null,
         lastPlayed: null,
         updateAvailable: null,
+        ...(entry?.productSlug ? { storeRef: entry.productSlug } : {}),
         coverSources: [
           ...manifestImageSources(manifest),
-          ...rankKeyImages(catalogImages).map((url): CoverSource => ({ kind: 'url', url }))
+          ...rankKeyImages(entry?.keyImages ?? []).map((url): CoverSource => ({ kind: 'url', url }))
         ]
       })
     })

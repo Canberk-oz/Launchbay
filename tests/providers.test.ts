@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isInstalledEpicGame, manifestImageSources, parseCatalogCache, rankKeyImages } from '../src/main/providers/epicScan'
+import { epicStorePageUrl, isInstalledEpicGame, manifestImageSources, parseCatalogCache, rankKeyImages } from '../src/main/providers/epicScan'
 import { gameSignals, isExcludedPackage, manifestColor, parseAppxManifest, parseGameConfig } from '../src/main/providers/xboxScan'
 
 test('epic: keeps complete base games only', () => {
@@ -40,7 +40,25 @@ test('epic: image fields in the manifest come first, catalog art is ordered tall
     ['https://cdn/tall.jpg', 'https://cdn/wide.jpg', 'https://cdn/shot.jpg']
   )
   const cache = Buffer.from(JSON.stringify([{ id: 'item1', keyImages: [{ type: 'Thumbnail', url: 'https://cdn/t.jpg' }] }])).toString('base64')
-  assert.equal(parseCatalogCache(cache).get('item1')?.[0].url, 'https://cdn/t.jpg')
+  assert.equal(parseCatalogCache(cache).get('item1')?.keyImages[0].url, 'https://cdn/t.jpg')
+})
+
+test('epic: store pages only for catalog entries that carry a usable slug', () => {
+  const cache = Buffer.from(
+    JSON.stringify([
+      { id: 'a', keyImages: [], customAttributes: { 'com.epicgames.app.productSlug': { type: 'STRING', value: 'alan-wake-2' } } },
+      { id: 'b', productSlug: 'fortnite/home' },
+      { id: 'c', productSlug: '../../evil' },
+      { id: 'd' }
+    ])
+  ).toString('base64')
+  const catalog = parseCatalogCache(cache)
+  assert.equal(catalog.get('a')?.productSlug, 'alan-wake-2')
+  assert.equal(catalog.get('b')?.productSlug, 'fortnite')
+  assert.equal(catalog.get('c')?.productSlug, undefined)
+  assert.equal(catalog.get('d')?.productSlug, undefined)
+  assert.equal(epicStorePageUrl({ storeRef: 'alan-wake-2' }), 'https://store.epicgames.com/p/alan-wake-2')
+  assert.equal(epicStorePageUrl({}), null)
 })
 
 const FORAGER_MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
