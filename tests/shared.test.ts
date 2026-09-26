@@ -46,6 +46,7 @@ function game(partial: Partial<Game>): Game {
     favoritedAt: null,
     lastPlayed: null,
     addedAt: null,
+    updateAvailable: null,
     isHidden: false,
     ...partial
   }

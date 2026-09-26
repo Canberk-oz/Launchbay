@@ -26,7 +26,7 @@ const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: str
       role="row"
       tabIndex={0}
       data-game-id={game.id}
-      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}`}
+      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.updateAvailable ? ', update ready' : ''}`}
       onClick={launch}
       onKeyDown={(e) => handleGameKeys(e, game, launch)}
       onContextMenu={(e) => {
@@ -39,6 +39,11 @@ const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: str
       </div>
       <div className="row__name" role="cell">
         <span className="row__title">{game.name}</span>
+        {game.updateAvailable && (
+          <span className="row__tag spec" title="An update is waiting in Steam">
+            Update
+          </span>
+        )}
         {error && <span className="row__error spec">Couldn’t launch</span>}
       </div>
       <div className="row__platform" role="cell">

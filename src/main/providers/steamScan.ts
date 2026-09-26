@@ -31,6 +31,7 @@ const EXCLUDED_NAMES = [
 ]
 
 // StateFlags bits (see Steam's EAppState).
+const STATE_UPDATE_REQUIRED = 2
 const STATE_FULLY_INSTALLED = 4
 const STATE_UNINSTALLING = 2048
 
@@ -128,6 +129,11 @@ export function isPlayableManifest(m: AppManifest): boolean {
   // Fully installed, or installed and currently updating (buildid is set once
   // a first install has completed; a fresh download in progress reports 0).
   return (m.stateFlags & STATE_FULLY_INSTALLED) !== 0 || (m.buildid !== '' && m.buildid !== '0')
+}
+
+/** Pure: Steam has an update queued for this app (StateFlags UpdateRequired). */
+export function hasPendingUpdate(m: AppManifest): boolean {
+  return (m.stateFlags & STATE_UPDATE_REQUIRED) !== 0
 }
 
 async function readLibraryPaths(steamPath: string): Promise<string[]> {
@@ -312,6 +318,7 @@ export async function scanSteam(env: SteamLocator = machine): Promise<ScannedGam
             sizeOnDisk: manifest.sizeOnDisk,
             playtimeMinutes: stats?.playtimeMinutes ?? null,
             lastPlayed,
+            updateAvailable: hasPendingUpdate(manifest),
             coverSources
           })
         })

@@ -166,6 +166,7 @@ export async function scanEpic(env: EpicLocator = machine()): Promise<ScannedGam
         sizeOnDisk: typeof manifest.InstallSize === 'number' ? manifest.InstallSize : null,
         playtimeMinutes: null,
         lastPlayed: null,
+        updateAvailable: null,
         coverSources: [
           ...manifestImageSources(manifest),
           ...rankKeyImages(catalogImages).map((url): CoverSource => ({ kind: 'url', url }))

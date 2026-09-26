@@ -5,7 +5,7 @@ import { formatPlaytime } from '../lib/format'
 import { arrowDirection, moveFocus } from '../lib/focus'
 import { useTrailerPreview } from '../hooks/useTrailerPreview'
 import { Cover } from './Cover'
-import { PlatformMark, StarIcon } from './Icons'
+import { PlatformMark, StarIcon, UpdateIcon } from './Icons'
 
 interface GameTileProps {
   game: Game
@@ -16,6 +16,7 @@ interface GameTileProps {
 export function tileMeta(game: Game): string {
   const parts = [PLATFORM_LABELS[game.platform]]
   if (game.playtimeMinutes) parts.push(formatPlaytime(game.playtimeMinutes))
+  if (game.updateAvailable) parts.push('Update ready')
   return parts.join(' · ')
 }
 
@@ -60,7 +61,7 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       role="button"
       tabIndex={0}
       data-game-id={game.id}
-      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}`}
+      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}${game.updateAvailable ? ', update ready' : ''}`}
       onPointerEnter={preview.onPointerEnter}
       onPointerLeave={preview.onPointerLeave}
       onClick={launch}
@@ -95,6 +96,12 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       <span className="tile__badge" title={PLATFORM_LABELS[game.platform]} aria-hidden="true">
         <PlatformMark platform={game.platform} size={12} />
       </span>
+
+      {game.updateAvailable && (
+        <span className="tile__badge tile__badge--update" title="An update is waiting in Steam" aria-hidden="true">
+          <UpdateIcon size={13} />
+        </span>
+      )}
 
       <button
         className={`tile__star${game.isFavorite ? ' is-on' : ''}`}

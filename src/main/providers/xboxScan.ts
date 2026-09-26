@@ -383,6 +383,7 @@ async function inspectPackage(pkg: RawPackage): Promise<ScannedGame | null> {
     sizeOnDisk: null,
     playtimeMinutes: null,
     lastPlayed: null,
+    updateAvailable: null,
     coverSources
   }
 }

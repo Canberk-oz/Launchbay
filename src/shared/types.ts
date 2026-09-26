@@ -59,6 +59,8 @@ export interface Game {
    * scan that finds it.
    */
   addedAt: number | null
+  /** Steam only: an update is waiting. Null means unknown (Epic and Xbox keep no local record). */
+  updateAvailable: boolean | null
   isHidden: boolean
 }
 

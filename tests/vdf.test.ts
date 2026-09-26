@@ -65,3 +65,11 @@ test('reads an appmanifest and filters non-games', () => {
   assert.equal(isPlayableManifest({ ...m, stateFlags: 1026, buildid: '0' }), false)
   assert.equal(isPlayableManifest({ ...m, stateFlags: 4 | 2048 }), false)
 })
+
+test('steam: StateFlags UpdateRequired (2) marks a pending update', async () => {
+  const { hasPendingUpdate, parseAppManifest } = await import('../src/main/providers/steamScan')
+  const acf = (flags: number) => `"AppState" { "appid" "620" "name" "Portal 2" "installdir" "Portal 2" "StateFlags" "${flags}" "buildid" "1" }`
+  assert.equal(hasPendingUpdate(parseAppManifest(acf(4))!), false) // fully installed
+  assert.equal(hasPendingUpdate(parseAppManifest(acf(6))!), true) // installed + update required
+  assert.equal(hasPendingUpdate(parseAppManifest(acf(1030))!), true) // + update started
+})

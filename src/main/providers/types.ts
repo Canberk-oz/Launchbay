@@ -26,6 +26,11 @@ export interface ScannedGame {
   playtimeMinutes: number | null
   /** Epoch ms, as recorded by the platform itself. */
   lastPlayed: number | null
+  /**
+   * The store has an update waiting for this game. Null when the store keeps
+   * no local record of it (Epic, Xbox), which is "unknown", not "up to date".
+   */
+  updateAvailable: boolean | null
   coverSources: CoverSource[]
 }
 

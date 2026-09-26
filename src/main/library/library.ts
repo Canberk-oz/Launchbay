@@ -287,6 +287,8 @@ export class LibraryService extends EventEmitter {
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,
       lastPlayed,
       addedAt: user.addedAt ?? null,
+      // Caches written before this field existed have no value: unknown until the next scan.
+      updateAvailable: g.updateAvailable ?? null,
       isHidden: !!user.hidden
     }
   }
