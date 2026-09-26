@@ -12,12 +12,12 @@ import { runPowerShellJson } from '../util/powershell'
 import { readImageSize } from '../util/imageSize'
 import type { CoverSource, ScannedGame } from './types'
 
-interface RawStartApp {
+export interface RawStartApp {
   Name: string
   AppID: string
 }
 
-interface RawPackage {
+export interface RawPackage {
   Name: string
   PackageFamilyName: string
   PackageFullName: string
@@ -387,14 +387,21 @@ async function inspectPackage(pkg: RawPackage): Promise<ScannedGame | null> {
   }
 }
 
-export async function scanXbox(): Promise<ScannedGame[]> {
-  let packages: RawPackage[] | RawPackage | null
-  try {
-    packages = await runPowerShellJson<RawPackage[] | RawPackage | null>(LIST_PACKAGES_SCRIPT, { timeoutMs: 60_000 })
-  } catch {
-    return [] // PowerShell or the Appx module unavailable
-  }
-  const list = Array.isArray(packages) ? packages : packages ? [packages] : []
-  const games = await Promise.all(list.map((p) => inspectPackage(p).catch(() => null)))
+/** Lists packaged apps; replaced in tests. */
+export type PackageLister = () => Promise<RawPackage[] | RawPackage | null>
+
+const listPackages: PackageLister = () =>
+  runPowerShellJson<RawPackage[] | RawPackage | null>(LIST_PACKAGES_SCRIPT, { timeoutMs: 60_000 })
+
+/**
+ * Packaged apps are part of Windows itself, so there is no "not installed"
+ * case: when the package list can't be read (PowerShell blocked, timed out,
+ * the Appx module failing), this throws and the library keeps the last known
+ * Xbox games.
+ */
+export async function scanXbox(list: PackageLister = listPackages): Promise<ScannedGame[]> {
+  const packages = await list()
+  const all = Array.isArray(packages) ? packages : packages ? [packages] : []
+  const games = await Promise.all(all.map((p) => inspectPackage(p).catch(() => null)))
   return games.filter((g): g is ScannedGame => g !== null)
 }

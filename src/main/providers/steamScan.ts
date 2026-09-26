@@ -34,24 +34,39 @@ const EXCLUDED_NAMES = [
 const STATE_FULLY_INSTALLED = 4
 const STATE_UNINSTALLING = 2048
 
-export async function findSteamPath(): Promise<string | null> {
+/** What `findSteamPath` reads from the machine; replaced in tests. */
+export interface SteamLocator {
+  readRegistry: typeof readRegistry
+  isDirectory: (path: string) => Promise<boolean>
+}
+
+const machine: SteamLocator = { readRegistry, isDirectory }
+
+/**
+ * The Steam folder, or null when Steam is not installed. Throws when the
+ * registry could not be read and the default folder is absent, because then
+ * "not installed" and "installed somewhere else" can't be told apart.
+ */
+export async function findSteamPath(env: SteamLocator = machine): Promise<string | null> {
   const candidates: string[] = []
+  let registryError: unknown = null
   try {
-    const [hkcu, hklm] = await readRegistry([
+    const [hkcu, hklm] = await env.readRegistry([
       { key: 'HKCU\\Software\\Valve\\Steam', names: ['SteamPath'] },
       { key: 'HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam', names: ['InstallPath'] }
     ])
     if (typeof hkcu?.SteamPath === 'string') candidates.push(hkcu.SteamPath)
     if (typeof hklm?.InstallPath === 'string') candidates.push(hklm.InstallPath)
-  } catch {
-    // PowerShell unavailable or blocked; fall back to the default location.
+  } catch (err) {
+    registryError = err // PowerShell unavailable or blocked; try the default location.
   }
   candidates.push(DEFAULT_STEAM_PATH)
 
   for (const candidate of candidates) {
     const normalized = win32.normalize(candidate)
-    if (await isDirectory(join(normalized, 'steamapps'))) return normalized
+    if (await env.isDirectory(join(normalized, 'steamapps'))) return normalized
   }
+  if (registryError) throw new Error('Could not read the Steam location from the registry', { cause: registryError })
   return null
 }
 
@@ -247,8 +262,8 @@ async function localCacheImages(steamPath: string, appid: string): Promise<{ cap
   return { capsule, header }
 }
 
-export async function scanSteam(): Promise<ScannedGame[]> {
-  const steamPath = await findSteamPath()
+export async function scanSteam(env: SteamLocator = machine): Promise<ScannedGame[]> {
+  const steamPath = await findSteamPath(env)
   if (!steamPath) return []
 
   const [libraries, userStats] = await Promise.all([readLibraryPaths(steamPath), readUserStats(steamPath)])

@@ -93,33 +93,46 @@ export function parseCatalogCache(raw: string): Map<string, KeyImage[]> {
   return byItemId
 }
 
-async function findEpicDataDir(): Promise<string | null> {
-  const programData = process.env.ProgramData || 'C:\\ProgramData'
-  const defaultDir = join(programData, 'Epic', 'EpicGamesLauncher', 'Data')
-  if (await isDirectory(join(defaultDir, 'Manifests'))) return defaultDir
+/** What `findEpicDataDir` reads from the machine; replaced in tests. */
+export interface EpicLocator {
+  programData: string
+  readRegistry: typeof readRegistry
+  isDirectory: (path: string) => Promise<boolean>
+}
+
+const machine = (): EpicLocator => ({
+  programData: process.env.ProgramData || 'C:\\ProgramData',
+  readRegistry,
+  isDirectory
+})
+
+/**
+ * The launcher's data folder, or null when Epic is not installed. Throws when
+ * the default folder is absent and the registry could not be read.
+ */
+export async function findEpicDataDir(env: EpicLocator = machine()): Promise<string | null> {
+  const defaultDir = join(env.programData, 'Epic', 'EpicGamesLauncher', 'Data')
+  if (await env.isDirectory(join(defaultDir, 'Manifests'))) return defaultDir
+  let reg: Awaited<ReturnType<typeof readRegistry>>[number] | undefined
   try {
-    const [reg] = await readRegistry([
+    ;[reg] = await env.readRegistry([
       { key: 'HKLM\\SOFTWARE\\WOW6432Node\\Epic Games\\EpicGamesLauncher', names: ['AppDataPath'] }
     ])
-    const dir = reg?.AppDataPath
-    if (typeof dir === 'string' && (await isDirectory(join(dir, 'Manifests')))) return dir
-  } catch {
-    // no registry access; treat as not installed
+  } catch (err) {
+    throw new Error('Could not read the Epic Games Launcher location from the registry', { cause: err })
   }
+  const dir = reg?.AppDataPath
+  if (typeof dir === 'string' && (await env.isDirectory(join(dir, 'Manifests')))) return dir
   return null
 }
 
-export async function scanEpic(): Promise<ScannedGame[]> {
-  const dataDir = await findEpicDataDir()
+export async function scanEpic(env: EpicLocator = machine()): Promise<ScannedGame[]> {
+  const dataDir = await findEpicDataDir(env)
   if (!dataDir) return []
 
   const manifestsDir = join(dataDir, 'Manifests')
-  let files: string[]
-  try {
-    files = (await fs.readdir(manifestsDir)).filter((f) => f.toLowerCase().endsWith('.item'))
-  } catch {
-    return []
-  }
+  // The folder was there a moment ago, so a failure here is an error, not "no games".
+  const files = (await fs.readdir(manifestsDir)).filter((f) => f.toLowerCase().endsWith('.item'))
 
   let catalog = new Map<string, KeyImage[]>()
   try {

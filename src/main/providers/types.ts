@@ -52,8 +52,11 @@ export interface GameProvider {
   readonly label: string
 
   /**
-   * Returns the installed games. Must resolve to `[]`, not throw, when the
-   * platform or its launcher is not installed on this machine.
+   * Returns the installed games. Resolves to `[]` only when the platform or
+   * its launcher is not installed on this machine. When the store is there but
+   * could not be read (PowerShell or the registry failed, its data folder was
+   * unreadable), it throws instead: the library then keeps the games it last
+   * knew for this platform rather than dropping them all.
    */
   scan(): Promise<ScannedGame[]>
 
