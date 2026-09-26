@@ -8,13 +8,15 @@ import { createHash } from 'node:crypto'
 import { createReadStream, promises as fs } from 'node:fs'
 import { extname, join } from 'node:path'
 import { Readable } from 'node:stream'
-import type { Game, MediaCacheInfo, TrailerState } from '@shared/types'
+import type { CoverFrame, Game, MediaCacheInfo, TrailerState } from '@shared/types'
 import type { CoverSource, GameProvider } from '../providers/types'
 import { directorySize, JsonStore, pathExists, writeFileAtomic } from '../util/fsutil'
 import { HttpError, httpGet, httpGetBuffer, httpGetText, isTransientError } from '../util/http'
 import { createLimiter, sleep } from '../util/concurrency'
 import { createLogger } from '../util/log'
-import { analyzeArtwork, type Artwork } from './artwork'
+import { ambientColor, analyzeArtwork, type Artwork } from './artwork'
+import { ambientOfColor } from './ambient'
+import { pickArtwork } from './framing'
 import { planDashPreview, rebaseFragments } from './dash'
 
 const log = createLogger('media')
@@ -22,7 +24,17 @@ const log = createLogger('media')
 export const MEDIA_SCHEME = 'glmedia'
 
 type CoverRecord =
-  | { status: 'ok'; file: string; source: string; updatedAt: number; logo?: boolean }
+  | {
+      status: 'ok'
+      file: string
+      source: string
+      updatedAt: number
+      /** Missing on records from before framing existed; those are re-analyzed on the next sync. */
+      frame?: CoverFrame
+      background?: string
+      /** Undefined on records from before ambient colors; null when the cover is colorless. */
+      ambient?: string | null
+    }
   | { status: 'failed'; error: string; updatedAt: number }
 
 type TrailerRecord =
@@ -42,6 +54,8 @@ export interface CoverJob {
 }
 
 const TRAILER_CACHE_LIMIT_BYTES = 768 * 1024 * 1024
+// Unreferenced files younger than this may belong to a write still in flight.
+const STRAY_FILE_GRACE_MS = 10 * 60_000
 const PROGRESSIVE_MAX_BYTES = 80 * 1024 * 1024
 // Steam's store API allows roughly 200 requests per 5 minutes.
 const LOOKUP_SPACING_MS = 1600
@@ -53,6 +67,7 @@ const PREVIEW_SKIP_SECONDS = 6
 
 const MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.gif': 'image/gif',
@@ -111,9 +126,10 @@ export class MediaService extends EventEmitter {
     return this.store.flush()
   }
 
-  private changed(): void {
+  /** Persists the state and tells the library which game's media changed. */
+  private changed(id: string): void {
     this.store.save()
-    this.emit('changed')
+    this.emit('changed', id)
   }
 
   // ---------------------------------------------------------------- covers
@@ -132,9 +148,30 @@ export class MediaService extends EventEmitter {
       games.map(async (game) => {
         if (this.coverJobs.has(game.id)) return
         const record = this.state.covers[game.id]
-        if (record?.status === 'ok' && (await pathExists(join(this.coversDir, record.file)))) return
+        let work = (): Promise<void> => this.fetchCover(game)
+        if (record?.status === 'ok' && (await pathExists(join(this.coversDir, record.file)))) {
+          if (record.frame && record.ambient !== undefined) return
+          if (record.frame) {
+            // Framed before ambient colors: read the color from the cached file, no network.
+            const job = this.coverLimit(() => this.addAmbient(game.id, record))
+              .catch((err) => log.warn(`ambient color for ${game.id} failed`, err))
+              .finally(() => this.coverJobs.delete(game.id))
+            this.coverJobs.set(game.id, job)
+            return
+          }
+          // Cached before covers were framed. Downloaded art only needs its
+          // pixels re-read; local picks (package logos) are chosen again.
+          work = /^https?:/i.test(record.source)
+            ? () => this.reframeCover(game.id, record)
+            : async () => {
+                await this.fetchCover(game)
+                if (this.state.covers[game.id]?.status === 'ok') return
+                this.state.covers[game.id] = record // keep the old cover rather than none
+                await this.reframeCover(game.id, record)
+              }
+        }
         if (record?.status === 'failed' && !opts.retryFailed) return
-        const job = this.coverLimit(() => this.fetchCover(game))
+        const job = this.coverLimit(work)
           .catch((err) => log.warn(`cover job for ${game.id} crashed`, err))
           .finally(() => this.coverJobs.delete(game.id))
         this.coverJobs.set(game.id, job)
@@ -142,15 +179,45 @@ export class MediaService extends EventEmitter {
     )
   }
 
-  coverIsLogo(id: string): boolean {
+  coverFrame(id: string): CoverFrame {
     const record = this.state.covers[id]
-    return record?.status === 'ok' && record.logo === true
+    return record?.status === 'ok' ? (record.frame ?? 'art') : 'art'
+  }
+
+  /** The URL or file the cached cover came from. */
+  coverSource(id: string): string | null {
+    const record = this.state.covers[id]
+    return record?.status === 'ok' ? record.source : null
+  }
+
+  coverBackground(id: string): string | null {
+    const record = this.state.covers[id]
+    return record?.status === 'ok' ? (record.background ?? null) : null
+  }
+
+  /** Adds the ambient color to a cover cached before ambient colors existed; leaves its frame alone. */
+  private async addAmbient(id: string, record: Extract<CoverRecord, { status: 'ok' }>): Promise<void> {
+    const ambient = ambientColor(await fs.readFile(join(this.coversDir, record.file)))
+    const current = this.state.covers[id]
+    if (current?.status !== 'ok' || current.file !== record.file) return // replaced meanwhile
+    current.ambient = ambient
+    this.changed(id)
+  }
+
+  coverAmbient(id: string): string | null {
+    const record = this.state.covers[id]
+    return record?.status === 'ok' ? (record.ambient ?? null) : null
+  }
+
+  private async reframeCover(id: string, record: Extract<CoverRecord, { status: 'ok' }>): Promise<void> {
+    const art = analyzeArtwork(await fs.readFile(join(this.coversDir, record.file)))
+    if (art) await this.saveCover(id, art, record.source)
   }
 
   /**
    * Tries the sources in order. A run of consecutive local files (package
-   * logos, Steam's own cache) is compared as a group, and the image showing
-   * the most artwork wins.
+   * logos, Steam's own cache) is compared as a group and `pickArtwork` chooses
+   * one, by the provider's tiers and how much artwork each image shows.
    */
   private async fetchCover(game: CoverJob): Promise<void> {
     let lastError = 'no cover source'
@@ -169,22 +236,25 @@ export class MediaService extends EventEmitter {
           lastError = errorMessage(err)
         }
       } else {
-        const group: string[] = []
+        const found: Array<{ art: Artwork; path: string; tier: number; background?: string }> = []
         while (i < sources.length) {
           const next = sources[i]
           if (next.kind !== 'file') break
-          group.push(next.path)
           i++
-        }
-        for (const path of group) {
           try {
-            const candidate = analyzeArtwork(await fs.readFile(path))
-            if (candidate && (!art || candidate.content > art.content)) {
-              art = candidate
-              origin = path
-            }
+            const candidate = analyzeArtwork(await fs.readFile(next.path))
+            if (candidate) found.push({ art: candidate, path: next.path, tier: next.tier ?? 0, background: next.background })
           } catch (err) {
             lastError = errorMessage(err)
+          }
+        }
+        const best = found[pickArtwork(found.map((f) => ({ tier: f.tier, frame: f.art.frame, content: f.art.content })))]
+        if (best) {
+          art = best.art
+          origin = best.path
+          // A transparent mark takes the color its package declares for it (and glows in it if colorless).
+          if (art.frame === 'mark' && !art.background && best.background) {
+            art = { ...art, background: best.background, ambient: art.ambient ?? ambientOfColor(best.background) }
           }
         }
       }
@@ -194,7 +264,7 @@ export class MediaService extends EventEmitter {
       }
     }
     this.state.covers[game.id] = { status: 'failed', error: lastError, updatedAt: Date.now() }
-    this.changed()
+    this.changed(game.id)
   }
 
   private async saveCover(id: string, art: Artwork, origin: string): Promise<void> {
@@ -204,8 +274,16 @@ export class MediaService extends EventEmitter {
     if (previous?.status === 'ok' && previous.file !== file) {
       await fs.rm(join(this.coversDir, previous.file), { force: true })
     }
-    this.state.covers[id] = { status: 'ok', file, source: origin, updatedAt: Date.now(), ...(art.logo ? { logo: true } : {}) }
-    this.changed()
+    this.state.covers[id] = {
+      status: 'ok',
+      file,
+      source: origin,
+      updatedAt: Date.now(),
+      frame: art.frame,
+      ...(art.background ? { background: art.background } : {}),
+      ambient: art.ambient
+    }
+    this.changed(id)
   }
 
   // -------------------------------------------------------------- trailers
@@ -274,7 +352,7 @@ export class MediaService extends EventEmitter {
         record = { status: 'failed', error: errorMessage(err), checkedAt: Date.now() }
       }
       this.state.trailers[game.id] = record
-      this.changed()
+      this.changed(game.id)
       return record
     })().finally(() => this.lookups.delete(game.id))
     this.lookups.set(game.id, job)
@@ -339,7 +417,7 @@ export class MediaService extends EventEmitter {
         log.warn(`trailer preview for ${id} failed:`, errorMessage(err))
         if (!isTransientError(err)) {
           this.state.trailers[id] = { status: 'failed', error: errorMessage(err), checkedAt: Date.now() }
-          this.changed()
+          this.changed(id)
         }
         return null
       })
@@ -377,7 +455,7 @@ export class MediaService extends EventEmitter {
     const record = this.state.trailers[id]
     if (record?.status === 'available') {
       record.file = file
-      this.changed()
+      this.store.save() // the cached file is not part of the game record
     }
   }
 
@@ -434,22 +512,89 @@ export class MediaService extends EventEmitter {
     this.store.save()
   }
 
+  /**
+   * Drops the cover and trailer of every game not in `keep` (uninstalled
+   * games), plus stray files no record points at. Games with a job in flight
+   * are left alone until the next pass.
+   */
+  async prune(keep: ReadonlySet<string>): Promise<void> {
+    const drop: string[] = []
+    for (let i = this.lookupQueue.length - 1; i >= 0; i--) {
+      if (!keep.has(this.lookupQueue[i].id)) this.lookupQueue.splice(i, 1)
+    }
+    for (const [id, record] of Object.entries(this.state.covers)) {
+      if (keep.has(id) || this.coverJobs.has(id)) continue
+      if (record.status === 'ok') drop.push(join(this.coversDir, record.file))
+      delete this.state.covers[id]
+    }
+    for (const [id, record] of Object.entries(this.state.trailers)) {
+      if (keep.has(id) || this.previews.has(id) || this.lookups.has(id)) continue
+      if (record.status === 'available' && record.file) drop.push(join(this.trailersDir, record.file))
+      delete this.state.trailers[id]
+    }
+
+    const referenced = new Set<string>()
+    for (const r of Object.values(this.state.covers)) if (r.status === 'ok') referenced.add(join(this.coversDir, r.file))
+    for (const r of Object.values(this.state.trailers)) if (r.status === 'available' && r.file) referenced.add(join(this.trailersDir, r.file))
+    const cutoff = Date.now() - STRAY_FILE_GRACE_MS
+    for (const dir of [this.coversDir, this.trailersDir]) {
+      for (const name of await fs.readdir(dir).catch(() => [] as string[])) {
+        const path = join(dir, name)
+        if (referenced.has(path) || drop.includes(path)) continue
+        const st = await fs.stat(path).catch(() => null)
+        if (st?.isFile() && st.mtimeMs < cutoff) drop.push(path)
+      }
+    }
+
+    if (drop.length === 0) return
+    await Promise.all(drop.map((path) => fs.rm(path, { force: true })))
+    this.store.save()
+    log.info(`pruned ${drop.length} cached media file(s) of games no longer installed`)
+  }
+
   async cacheInfo(): Promise<MediaCacheInfo> {
     const [coverBytes, trailerBytes] = await Promise.all([directorySize(this.coversDir), directorySize(this.trailersDir)])
     return { coverBytes, trailerBytes }
   }
 
+  // ------------------------------------------------------- outside files
+
+  /**
+   * Files outside the media cache the renderer may show (Steam screenshots),
+   * by opaque token. Only files the main process registered are served, so
+   * the renderer can't ask for arbitrary paths.
+   */
+  private readonly files = new Map<string, string>()
+
+  /** A glmedia:// URL for a local image, registered for this session. */
+  fileUrl(path: string): string {
+    const ext = extname(path).toLowerCase()
+    const token = `${createHash('sha1').update(path).digest('hex').slice(0, 24)}${ext}`
+    this.files.set(token, path)
+    return `${MEDIA_SCHEME}://files/${token}`
+  }
+
+  /** The file behind a registered glmedia://files URL, or null. */
+  filePath(url: string): string | null {
+    const match = /^glmedia:\/\/files\/([\w.]+)$/.exec(url)
+    return match ? (this.files.get(match[1]) ?? null) : null
+  }
+
   // -------------------------------------------------------------- protocol
 
-  /** glmedia://covers/<file> and glmedia://trailers/<file>, with Range support for video. */
+  /**
+   * glmedia://covers/<file>, glmedia://trailers/<file> (Range support for
+   * video) and glmedia://files/<token> (registered outside files).
+   */
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const dir = url.hostname === 'covers' ? this.coversDir : url.hostname === 'trailers' ? this.trailersDir : null
     const name = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
-    if (!dir || !/^[\w.-]+$/.test(name) || name.includes('..')) {
+    const registered = url.hostname === 'files' ? this.files.get(name) : undefined
+    if ((!dir && !registered) || !/^[\w.-]+$/.test(name) || name.includes('..')) {
       return new Response('Not found', { status: 404 })
     }
-    const path = join(dir, name)
+    const path = registered ?? join(dir!, name)
     let size: number
     try {
       size = (await fs.stat(path)).size
@@ -460,7 +605,7 @@ export class MediaService extends EventEmitter {
     const headers: Record<string, string> = {
       'Content-Type': MIME[extname(name).toLowerCase()] ?? 'application/octet-stream',
       'Accept-Ranges': 'bytes',
-      'Cache-Control': url.hostname === 'covers' ? 'public, max-age=31536000, immutable' : 'no-cache'
+      'Cache-Control': url.hostname === 'trailers' ? 'no-cache' : 'public, max-age=31536000, immutable'
     }
     const body = (start?: number, end?: number): ReadableStream =>
       Readable.toWeb(createReadStream(path, start === undefined ? undefined : { start, end })) as unknown as ReadableStream

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { TILE_SIZE_MAX, TILE_SIZE_MIN } from '@shared/types'
 import {
   closeSettings,
+  openProperties,
   focusSearch,
   launchGame,
   openSettings,
@@ -11,12 +12,14 @@ import {
   hotkeyLabel,
   updateSettings
 } from './actions'
-import { useStore } from './store'
+import { anySheetOpen, useStore } from './store'
 import { TitleBar } from './components/TitleBar'
 import { Toolbar } from './components/Toolbar'
 import { LibraryView } from './components/LibraryView'
 import { LaunchOverlay } from './components/LaunchOverlay'
 import { SettingsPanel } from './components/SettingsPanel'
+import { PropertiesPanel } from './components/PropertiesPanel'
+import { DiskUsagePanel } from './components/DiskUsagePanel'
 import { Toasts } from './components/Toasts'
 
 const api = window.launchbay
@@ -24,12 +27,14 @@ const api = window.launchbay
 function useMainProcessEvents(setAnim: (a: 'in' | 'out' | null) => void): void {
   useEffect(() => {
     const offs = [
-      api.onLibraryUpdated((games) => useStore.setState({ games })),
       api.onScanStatus((scan) => useStore.setState({ scan })),
       api.onSettingsChanged((settings) => useStore.setState({ settings: { ...settings, ...pendingSettings() } })),
       api.onHotkeyStatus((hotkey) => useStore.setState({ hotkey })),
       api.onOpenSettings(() => openSettings()),
+      api.onNotice((notice) => pushToast(notice, notice.tone === 'error' ? 8000 : 3200)),
       api.onContextAction(({ action, id }) => {
+        if (action === 'properties') return openProperties(id)
+        if (action === 'new-collection') return openProperties(id, 'collections')
         if (action !== 'launch') return
         const game = useStore.getState().games.find((g) => g.id === id)
         if (game) void launchGame(game, document.querySelector(`[data-game-id="${CSS.escape(id)}"] .cover-host`))
@@ -78,7 +83,7 @@ function useGlobalKeys(): void {
         if (state.settings.viewMode !== 'grid') return
         const step = e.key === '-' ? -24 : 24
         updateSettings({ tileSize: Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, state.settings.tileSize + step)) })
-      } else if (e.key === 'Escape' && !e.defaultPrevented && !state.settingsOpen) {
+      } else if (e.key === 'Escape' && !e.defaultPrevented && !anySheetOpen(state)) {
         if (state.search) useStore.setState({ search: '' })
         else if (state.overlay) void api.hideWindow()
       }
@@ -127,6 +132,8 @@ export function App(): React.JSX.Element {
       <LibraryView />
       <LaunchOverlay />
       <SettingsPanel />
+      <PropertiesPanel />
+      <DiskUsagePanel />
       <Toasts />
     </div>
   )

@@ -12,7 +12,7 @@ extraResources:
   - from: resources
     to: .
     filter:
-      - "*.png"
+      - "**/*.png"
 asar: true
 win:
   target:

@@ -1,11 +1,11 @@
 import { memo, useRef } from 'react'
 import { PLATFORM_LABELS, type Game } from '@shared/types'
-import { focusSearch, launchGame, toggleFavorite } from '../actions'
+import { focusSearch, launchGame, openProperties, toggleFavorite } from '../actions'
 import { formatPlaytime } from '../lib/format'
 import { arrowDirection, moveFocus } from '../lib/focus'
 import { useTrailerPreview } from '../hooks/useTrailerPreview'
 import { Cover } from './Cover'
-import { PlatformMark, StarIcon } from './Icons'
+import { PlatformMark, StarIcon, UpdateIcon } from './Icons'
 
 interface GameTileProps {
   game: Game
@@ -15,7 +15,10 @@ interface GameTileProps {
 
 export function tileMeta(game: Game): string {
   const parts = [PLATFORM_LABELS[game.platform]]
+  // Only the store's own playtime: Launchbay-tracked time needs its full label, which the caption can't fit.
   if (game.playtimeMinutes) parts.push(formatPlaytime(game.playtimeMinutes))
+  if (game.isRunning) parts.push('Running')
+  if (game.updateAvailable) parts.push('Update ready')
   return parts.join(' · ')
 }
 
@@ -26,7 +29,10 @@ export function handleGameKeys(e: React.KeyboardEvent<HTMLElement>, game: Game, 
     if (!moveFocus(e.currentTarget, dir) && dir === 'up') focusSearch()
     return
   }
-  if (e.key === 'Enter' || e.key === ' ') {
+  if (e.key === 'Enter' && e.altKey) {
+    e.preventDefault()
+    openProperties(game.id) // Alt+Enter: Properties, as in Explorer
+  } else if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     launch()
   } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -53,6 +59,7 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
   if (game.isFavorite) classes.push('is-favorite')
   if (error) classes.push('is-failed')
   if (launching) classes.push('is-launching')
+  if (game.isRunning) classes.push('is-running')
 
   return (
     <div
@@ -60,7 +67,8 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       role="button"
       tabIndex={0}
       data-game-id={game.id}
-      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}`}
+      style={game.coverAmbient ? ({ '--ambient': game.coverAmbient } as React.CSSProperties) : undefined}
+      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}${game.isRunning ? ', running' : ''}${game.updateAvailable ? ', update ready' : ''}`}
       onPointerEnter={preview.onPointerEnter}
       onPointerLeave={preview.onPointerLeave}
       onClick={launch}
@@ -96,6 +104,12 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
         <PlatformMark platform={game.platform} size={12} />
       </span>
 
+      {game.updateAvailable && (
+        <span className="tile__badge tile__badge--update" title="An update is waiting in Steam" aria-hidden="true">
+          <UpdateIcon size={13} />
+        </span>
+      )}
+
       <button
         className={`tile__star${game.isFavorite ? ' is-on' : ''}`}
         tabIndex={-1}
@@ -111,6 +125,13 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       >
         <StarIcon filled={game.isFavorite} size={15} />
       </button>
+
+      {game.isRunning && !error && (
+        <span className="tile__running" aria-hidden="true">
+          <span className="tile__running-dot" />
+          <span className="spec">Running</span>
+        </span>
+      )}
 
       {error && (
         <span className="tile__error" role="status">

@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Platform } from '@shared/types'
-import { dismissLaunch } from '../actions'
+import { dismissLaunch, LAUNCH_EXPAND_MS } from '../actions'
 import { useStore, type LaunchState, type Rect } from '../store'
 import { Cover } from './Cover'
 import { Keys } from './Keys'
 
-const EXPAND_MS = 520
 const LAUNCHERS: Record<Platform, string> = {
   steam: 'Steam',
   epic: 'the Epic Games Launcher',
@@ -80,7 +79,7 @@ function Scene({ launch }: { launch: LaunchState }): React.JSX.Element {
     }
     const animation = el.animate(
       [{ transform: 'translate(0px, 0px) scale(1)', filter: 'blur(0px) brightness(1) saturate(1)', borderRadius: '6px' }, end],
-      { duration: EXPAND_MS, easing: 'cubic-bezier(0.25, 0.8, 0.2, 1)', fill: 'forwards' }
+      { duration: LAUNCH_EXPAND_MS, easing: 'cubic-bezier(0.25, 0.8, 0.2, 1)', fill: 'forwards' }
     )
     return () => animation.cancel()
     // Runs once per launch; the scene is keyed by the launch token.
@@ -98,7 +97,12 @@ function Scene({ launch }: { launch: LaunchState }): React.JSX.Element {
   }, [])
 
   return (
-    <div className="launch" data-phase={launch.phase} data-status={launch.status}>
+    <div
+      className="launch"
+      data-phase={launch.phase}
+      data-status={launch.status}
+      style={launch.game.coverAmbient ? ({ '--ambient': launch.game.coverAmbient } as React.CSSProperties) : undefined}
+    >
       <div className="launch__backdrop" />
       <div className="launch__cover" ref={cover}>
         <Cover game={launch.game} />

@@ -31,6 +31,13 @@ export const SearchIcon = (p: IconProps): React.JSX.Element => (
   </Stroke>
 )
 
+/** An arrow settling into a tray: an update waiting to install. */
+export const UpdateIcon = (p: IconProps): React.JSX.Element => (
+  <Stroke {...p}>
+    <path d="M12 4.5v10M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Stroke>
+)
+
 export const CloseIcon = (p: IconProps): React.JSX.Element => (
   <Stroke {...p}>
     <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />

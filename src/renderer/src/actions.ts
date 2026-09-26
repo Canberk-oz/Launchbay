@@ -58,6 +58,12 @@ export function toggleFavorite(game: Game): void {
   void api.setFavorite(game.id, favorite)
 }
 
+/** Replaces a game's collections, shown at once and confirmed by the next library patch. */
+export function setCollections(game: Game, names: string[]): void {
+  set((s) => ({ games: s.games.map((g) => (g.id === game.id ? { ...g, tags: names } : g)) }))
+  void api.setCollections(game.id, names)
+}
+
 export function unhideGame(id: string): void {
   set((s) => ({ games: s.games.map((g) => (g.id === id ? { ...g, isHidden: false } : g)) }))
   void api.setHidden(id, false)
@@ -75,8 +81,36 @@ export async function refreshLibrary(): Promise<void> {
   }
 }
 
+export async function exportLibrary(format: 'json' | 'csv'): Promise<void> {
+  const result = await api.exportLibrary(format).catch((err: unknown) => ({ saved: false as const, error: String(err) }))
+  if (result.saved) {
+    pushToast({ tone: 'info', title: `Exported ${result.count === 1 ? '1 game' : `${result.count} games`}`, message: result.path }, 4200)
+  } else if (result.error) {
+    pushToast({ tone: 'error', title: 'Export failed', message: result.error }, 8000)
+  }
+}
+
+// One sheet at a time: opening one closes the others.
+const NO_SHEET = { settingsOpen: false, propertiesId: null, propertiesFocus: null, diskUsageOpen: false }
+
 export function openSettings(): void {
-  set({ settingsOpen: true })
+  set({ ...NO_SHEET, settingsOpen: true })
+}
+
+export function openProperties(id: string, focus: 'collections' | null = null): void {
+  set({ ...NO_SHEET, propertiesId: id, propertiesFocus: focus })
+}
+
+export function openDiskUsage(): void {
+  set({ ...NO_SHEET, diskUsageOpen: true })
+}
+
+export function closeDiskUsage(): void {
+  set({ diskUsageOpen: false })
+}
+
+export function closeProperties(): void {
+  set({ propertiesId: null })
 }
 
 export function closeSettings(): void {
@@ -89,7 +123,8 @@ export function focusSearch(): void {
 
 // ----------------------------------------------------------------- launch
 
-const EXPAND_MS = 520
+/** The cover's expansion into the launch scene (LaunchOverlay animates it). */
+export const LAUNCH_EXPAND_MS = 520
 const MIN_HOLD_MS = 1100
 const RESULT_HOLD_MS = 650
 const SAFETY_TIMEOUT_MS = 13_000
@@ -146,7 +181,7 @@ export async function launchGame(game: Game, originEl: Element | null): Promise<
   set({ launch: { token, game, origin: rectOf(originEl), phase: 'opening', status: 'starting' } })
   setTimeout(() => {
     if (get().launch?.phase === 'opening') patchLaunch(token, { phase: 'waiting' })
-  }, EXPAND_MS)
+  }, LAUNCH_EXPAND_MS)
 
   const result = await Promise.race([
     api
@@ -156,7 +191,7 @@ export async function launchGame(game: Game, originEl: Element | null): Promise<
   ])
 
   if (!result.ok) {
-    await sleep(Math.max(0, EXPAND_MS - (Date.now() - started)))
+    await sleep(Math.max(0, LAUNCH_EXPAND_MS - (Date.now() - started)))
     patchLaunch(token, { status: 'failed', phase: 'closing' })
     await sleep(LAUNCH_CLOSE_MS)
     patchLaunch(token, null)

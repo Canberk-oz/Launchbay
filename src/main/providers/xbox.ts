@@ -18,5 +18,17 @@ export const xboxProvider: GameProvider = {
 
   launchWatch(game) {
     return { dirs: [game.installPath] }
+  },
+
+  uninstallHandoff(game) {
+    return {
+      url: 'ms-settings:appsfeatures',
+      via: 'Windows Settings',
+      steps: `Settings opens on Installed apps. Find ${game.name} there, open its ⋯ menu and choose Uninstall.`
+    }
+  },
+
+  storePageUrl(game) {
+    return `ms-windows-store://pdp/?PFN=${encodeURIComponent(game.platformId)}`
   }
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isInstalledEpicGame, manifestImageSources, parseCatalogCache, rankKeyImages } from '../src/main/providers/epicScan'
-import { gameSignals, isExcludedPackage, parseAppxManifest, parseGameConfig } from '../src/main/providers/xboxScan'
+import { epicStorePageUrl, isInstalledEpicGame, manifestImageSources, parseCatalogCache, rankKeyImages } from '../src/main/providers/epicScan'
+import { gameSignals, isExcludedPackage, manifestColor, parseAppxManifest, parseGameConfig } from '../src/main/providers/xboxScan'
 
 test('epic: keeps complete base games only', () => {
   const base = {
@@ -40,7 +40,25 @@ test('epic: image fields in the manifest come first, catalog art is ordered tall
     ['https://cdn/tall.jpg', 'https://cdn/wide.jpg', 'https://cdn/shot.jpg']
   )
   const cache = Buffer.from(JSON.stringify([{ id: 'item1', keyImages: [{ type: 'Thumbnail', url: 'https://cdn/t.jpg' }] }])).toString('base64')
-  assert.equal(parseCatalogCache(cache).get('item1')?.[0].url, 'https://cdn/t.jpg')
+  assert.equal(parseCatalogCache(cache).get('item1')?.keyImages[0].url, 'https://cdn/t.jpg')
+})
+
+test('epic: store pages only for catalog entries that carry a usable slug', () => {
+  const cache = Buffer.from(
+    JSON.stringify([
+      { id: 'a', keyImages: [], customAttributes: { 'com.epicgames.app.productSlug': { type: 'STRING', value: 'alan-wake-2' } } },
+      { id: 'b', productSlug: 'fortnite/home' },
+      { id: 'c', productSlug: '../../evil' },
+      { id: 'd' }
+    ])
+  ).toString('base64')
+  const catalog = parseCatalogCache(cache)
+  assert.equal(catalog.get('a')?.productSlug, 'alan-wake-2')
+  assert.equal(catalog.get('b')?.productSlug, 'fortnite')
+  assert.equal(catalog.get('c')?.productSlug, undefined)
+  assert.equal(catalog.get('d')?.productSlug, undefined)
+  assert.equal(epicStorePageUrl({ storeRef: 'alan-wake-2' }), 'https://store.epicgames.com/p/alan-wake-2')
+  assert.equal(epicStorePageUrl({}), null)
 })
 
 const FORAGER_MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
@@ -51,6 +69,7 @@ const FORAGER_MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
     <Application Id="App" Executable="WinUAPRunner.exe" EntryPoint="WinUAPRunner.App">
       <uap:VisualElements DisplayName="Forager" Square150x150Logo="Assets\\Logo.png" Square44x44Logo="Assets\\SmallLogo.png" BackgroundColor="transparent">
         <uap:DefaultTile Wide310x150Logo="Assets\\WideLogo.png" Square310x310Logo="Assets\\LargeLogo.png"></uap:DefaultTile>
+        <uap:SplashScreen Image="Assets\\SplashScreen.png" BackgroundColor="#1D2B53" />
       </uap:VisualElements>
     </Application>
   </Applications>
@@ -62,7 +81,15 @@ test('xbox: parses AppxManifest names, logos and protocols', () => {
   assert.equal(m.displayName, 'Forager')
   assert.equal(m.logo, 'Assets\\StoreLogo.png')
   assert.equal(m.applications[0].id, 'App')
-  assert.deepEqual(m.applications[0].logos, ['Assets\\LargeLogo.png', 'Assets\\Logo.png', 'Assets\\WideLogo.png', 'Assets\\SmallLogo.png'])
+  // Splash screen first, then the large and wide tiles, small icons last. The
+  // splash has its own color; the tiles' "transparent" declares none.
+  assert.deepEqual(m.applications[0].visuals, [
+    { reference: 'Assets\\SplashScreen.png', tier: 0, background: '#1d2b53' },
+    { reference: 'Assets\\LargeLogo.png', tier: 1 },
+    { reference: 'Assets\\WideLogo.png', tier: 2 },
+    { reference: 'Assets\\Logo.png', tier: 3 },
+    { reference: 'Assets\\SmallLogo.png', tier: 3 }
+  ])
 
   const solitaire = parseAppxManifest(`<Package xmlns:uap="x"><Properties><DisplayName>Solitaire &amp; Casual Games</DisplayName></Properties>
     <Applications><Application Id="App"><Extensions>
@@ -90,6 +117,25 @@ test('xbox: game heuristics', () => {
   assert.equal(isExcludedPackage('Microsoft.624F8B84B80'), false) // Forza Horizon
   assert.equal(isExcludedPackage('HumbleBundle.ForagerWin10'), false)
 
-  const gdk = parseGameConfig(`<Game configVersion="1"><ShellVisuals DefaultDisplayName="Halo Infinite" Square480x480Logo="Logo480.png" Square150x150Logo="Logo.png" SplashScreenImage="Splash.png" StoreLogo="StoreLogo.png"/></Game>`)
-  assert.deepEqual(gdk, { displayName: 'Halo Infinite', logos: ['Logo480.png', 'Logo.png', 'Splash.png', 'StoreLogo.png'] })
+  const gdk = parseGameConfig(`<Game configVersion="1"><ShellVisuals DefaultDisplayName="Halo Infinite" Square480x480Logo="Logo480.png" Square150x150Logo="Logo.png" SplashScreenImage="Splash.png" StoreLogo="StoreLogo.png" BackgroundColor="#000000"/></Game>`)
+  assert.deepEqual(gdk, {
+    displayName: 'Halo Infinite',
+    visuals: [
+      { reference: 'Splash.png', tier: 0, background: '#000000' },
+      { reference: 'Logo480.png', tier: 1, background: '#000000' },
+      { reference: 'Logo.png', tier: 3, background: '#000000' },
+      { reference: 'StoreLogo.png', tier: 3, background: '#000000' }
+    ]
+  })
+})
+
+test('xbox: manifest colors become CSS colors', () => {
+  assert.equal(manifestColor('transparent'), undefined)
+  assert.equal(manifestColor('#1D2B53'), '#1d2b53')
+  assert.equal(manifestColor('#FFF'), '#fff')
+  assert.equal(manifestColor('#FF107C10'), '#107c10') // alpha first
+  assert.equal(manifestColor('#00107C10'), undefined) // fully transparent
+  assert.equal(manifestColor('black'), 'black')
+  assert.equal(manifestColor('url(x)'), undefined)
+  assert.equal(manifestColor(undefined), undefined)
 })

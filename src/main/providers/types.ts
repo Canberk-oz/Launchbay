@@ -1,7 +1,14 @@
 import type { Game, Platform } from '@shared/types'
 
-/** Where a cover image can come from, tried in order until one works. */
-export type CoverSource = { kind: 'url'; url: string } | { kind: 'file'; path: string }
+/**
+ * Where a cover image can come from, tried in order until one works. A run of
+ * consecutive files is weighed as a group (see `pickArtwork`): `tier` ranks the
+ * provider's asset kinds (lower first, default 0), and `background` is the
+ * color the asset was designed to sit on, when its package declares one.
+ */
+export type CoverSource =
+  | { kind: 'url'; url: string }
+  | { kind: 'file'; path: string; tier?: number; background?: string }
 
 /**
  * What a provider knows about an installed game. The library service turns it
@@ -16,9 +23,22 @@ export interface ScannedGame {
   installPath: string
   launchCommand: string
   sizeOnDisk: number | null
+  /**
+   * Set when the store reports no size: Launchbay then measures the install
+   * folder in the background and caches the result under this key, so a new
+   * key (Xbox: a new package version) means measuring again.
+   */
+  sizeKey?: string
   playtimeMinutes: number | null
   /** Epoch ms, as recorded by the platform itself. */
   lastPlayed: number | null
+  /**
+   * The store has an update waiting for this game. Null when the store keeps
+   * no local record of it (Epic, Xbox), which is "unknown", not "up to date".
+   */
+  updateAvailable: boolean | null
+  /** An id the provider needs to build its store page beyond `platformId` (Epic's product slug). */
+  storeRef?: string
   coverSources: CoverSource[]
 }
 
@@ -26,6 +46,28 @@ export interface TrailerInfo {
   /** `dash`: an MPD manifest; `progressive`: a directly playable mp4/webm. */
   kind: 'dash' | 'progressive'
   url: string
+}
+
+/** A screenshot the store keeps on this PC. */
+export interface ScreenshotFile {
+  path: string
+  /** A smaller copy the store made, when there is one. */
+  thumbnail?: string
+  /** Epoch ms (the file's modification time). */
+  takenAt: number
+}
+
+/**
+ * Where a game is uninstalled: the store's own flow, which Launchbay only
+ * opens. Launchbay never deletes game files or removes packages itself.
+ */
+export interface UninstallHandoff {
+  /** Opened after the user confirms. */
+  url: string
+  /** Who does the uninstalling, e.g. "Steam", "Windows Settings". */
+  via: string
+  /** What happens next, in a sentence or two for the confirmation dialog. */
+  steps: string
 }
 
 export interface LaunchWatch {
@@ -45,8 +87,11 @@ export interface GameProvider {
   readonly label: string
 
   /**
-   * Returns the installed games. Must resolve to `[]`, not throw, when the
-   * platform or its launcher is not installed on this machine.
+   * Returns the installed games. Resolves to `[]` only when the platform or
+   * its launcher is not installed on this machine. When the store is there but
+   * could not be read (PowerShell or the registry failed, its data folder was
+   * unreadable), it throws instead: the library then keeps the games it last
+   * knew for this platform rather than dropping them all.
    */
   scan(): Promise<ScannedGame[]>
 
@@ -58,4 +103,16 @@ export interface GameProvider {
 
   /** Optional capability: how to recognise that the game is actually running. */
   launchWatch?(game: Game): LaunchWatch
+
+  /**
+   * Optional capability: the game's page in its store, or null when it can't
+   * be built for this game (the menu then leaves the item out).
+   */
+  storePageUrl?(game: Pick<ScannedGame, 'platformId' | 'storeRef'>): string | null
+
+  /** Optional capability: how to hand an uninstall to the store. */
+  uninstallHandoff?(game: Game): UninstallHandoff | null
+
+  /** Optional capability: screenshots the store keeps locally, newest first. */
+  screenshots?(game: Game): Promise<ScreenshotFile[]>
 }

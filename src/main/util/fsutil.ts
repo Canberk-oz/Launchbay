@@ -1,5 +1,9 @@
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
+import { sleep } from './concurrency'
+import { createLogger } from './log'
+
+const log = createLogger('store')
 
 export async function pathExists(p: string): Promise<boolean> {
   try {
@@ -29,8 +33,6 @@ export async function readJsonFile<T>(file: string): Promise<T | null> {
     return null
   }
 }
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 /**
  * Writes via a temp file and rename so a crash mid-write never leaves a
@@ -93,7 +95,9 @@ export class JsonStore<T> {
       this.timer = null
     }
     const json = JSON.stringify(this.data)
-    this.writing = this.writing.then(() => writeFileAtomic(this.file, json)).catch(() => undefined)
+    this.writing = this.writing
+      .then(() => writeFileAtomic(this.file, json))
+      .catch((err) => log.error(`could not save ${this.file}; the change stays in memory until the next save`, err))
     await this.writing
   }
 }

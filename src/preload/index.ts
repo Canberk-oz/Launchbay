@@ -15,23 +15,28 @@ const api: LaunchbayApi = {
   refreshLibrary: () => ipcRenderer.invoke(IPC.refreshLibrary),
   setFavorite: (id, favorite) => ipcRenderer.invoke(IPC.setFavorite, id, favorite),
   setHidden: (id, hidden) => ipcRenderer.invoke(IPC.setHidden, id, hidden),
+  setCollections: (id, names) => ipcRenderer.invoke(IPC.setCollections, id, names),
   launchGame: (id) => ipcRenderer.invoke(IPC.launchGame, id),
   getTrailer: (id) => ipcRenderer.invoke(IPC.getTrailer, id),
   showContextMenu: (id) => ipcRenderer.invoke(IPC.showContextMenu, id),
+  getGameDetails: (id) => ipcRenderer.invoke(IPC.getGameDetails, id),
+  openScreenshot: (url) => ipcRenderer.invoke(IPC.openScreenshot, url),
   updateSettings: (patch) => ipcRenderer.invoke(IPC.updateSettings, patch),
   setHotkey: (accelerator) => ipcRenderer.invoke(IPC.setHotkey, accelerator),
   suspendHotkey: (suspended) => ipcRenderer.invoke(IPC.suspendHotkey, suspended),
   hideWindow: () => ipcRenderer.invoke(IPC.hideWindow),
   getMediaCacheInfo: () => ipcRenderer.invoke(IPC.getMediaCacheInfo),
   clearTrailerCache: () => ipcRenderer.invoke(IPC.clearTrailerCache),
+  exportLibrary: (format) => ipcRenderer.invoke(IPC.exportLibrary, format),
 
-  onLibraryUpdated: (cb) => subscribe(IPC.libraryUpdated, cb),
+  onLibraryPatch: (cb) => subscribe(IPC.libraryPatch, cb),
   onScanStatus: (cb) => subscribe(IPC.scanStatus, cb),
   onSettingsChanged: (cb) => subscribe(IPC.settingsChanged, cb),
   onHotkeyStatus: (cb) => subscribe(IPC.hotkeyStatus, cb),
   onWindowVisibility: (cb) => subscribe(IPC.windowVisibility, cb),
   onContextAction: (cb) => subscribe(IPC.contextAction, cb),
-  onOpenSettings: (cb) => subscribe(IPC.openSettings, () => cb())
+  onOpenSettings: (cb) => subscribe(IPC.openSettings, () => cb()),
+  onNotice: (cb) => subscribe(IPC.notice, cb)
 }
 
 contextBridge.exposeInMainWorld('launchbay', api)

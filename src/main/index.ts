@@ -1,11 +1,13 @@
-import { app, BrowserWindow, globalShortcut, Menu, protocol } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, protocol } from 'electron'
 import { join } from 'node:path'
 import { acceleratorKeys } from '@shared/accelerator'
 import { IPC } from '@shared/ipc'
 import type { Settings } from '@shared/types'
+import { GameActions } from './gameActions'
 import { HotkeyManager } from './hotkey'
 import { registerIpc } from './ipc'
 import { LaunchService } from './launch'
+import { ProcessWatcher } from './processWatch'
 import { LibraryService } from './library/library'
 import { MEDIA_SCHEME, MediaService } from './library/media'
 import { providerFor } from './providers'
@@ -63,6 +65,8 @@ async function main(): Promise<void> {
   await app.whenReady()
   // No menu bar, and none of its default accelerators (Ctrl+R reload, Ctrl+W close, zoom).
   Menu.setApplicationMenu(null)
+  // The app is always dark, so native menus and dialogs are too, whatever the OS setting.
+  nativeTheme.themeSource = 'dark'
   const root = app.getPath('userData')
   initLogFile(join(root, 'launchbay.log'))
   log.info(`Launchbay ${app.getVersion()} starting (Electron ${process.versions.electron})`)
@@ -77,7 +81,12 @@ async function main(): Promise<void> {
   const library = new LibraryService(root, media)
   await library.init()
 
-  const launcher = new LaunchService(library)
+  // Running games: polled only while the window is visible, a launch is being
+  // confirmed, or a game it saw start is still running (see processWatch.ts).
+  const watcher = new ProcessWatcher(() => library.watchTargets())
+  watcher.on('running', (ids: ReadonlySet<string>) => library.setRunning(ids))
+  const launcher = new LaunchService(library, watcher)
+  const actions = new GameActions(library, launcher, media)
   const windows = new WindowManager(root, {
     closeToTray: () => settings.get().closeToTray,
     isQuitting: () => quitting,
@@ -92,16 +101,25 @@ async function main(): Promise<void> {
     () => media.flush(),
     () => windows.flush()
   )
-  disposers.push(() => launcher.dispose())
+  // The watcher first: its final empty running set closes open play sessions.
+  disposers.push(() => watcher.dispose(), () => launcher.dispose(), () => library.dispose())
 
   const send = (channel: string, payload?: unknown): void => {
     const win = windows.win
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
   }
 
-  registerIpc({ library, media, settings, hotkeys, launcher, windows, isPackaged: app.isPackaged, startHidden })
+  actions.on('notice', (notice) => send(IPC.notice, notice))
 
-  library.on('changed', throttle(() => send(IPC.libraryUpdated, library.list()), 150))
+  registerIpc({ library, media, settings, hotkeys, actions, windows, isPackaged: app.isPackaged, startHidden })
+
+  library.on(
+    'changed',
+    throttle(() => {
+      const patch = library.drainChanges()
+      if (patch) send(IPC.libraryPatch, patch)
+    }, 150)
+  )
   library.on('scan-status', (status) => send(IPC.scanStatus, status))
   settings.on('changed', (next: Settings, prev: Settings) => {
     send(IPC.settingsChanged, next)
@@ -120,7 +138,25 @@ async function main(): Promise<void> {
   applyLoginItem(initial.launchAtLogin)
 
   if (quitting) return // quit requested while starting up
-  await windows.create({ show: !startHidden })
+  const win = await windows.create({ show: !startHidden })
+
+  // Watch for running games while the window is on screen.
+  const syncVisible = (): void => {
+    if (!win.isDestroyed() && win.isVisible() && !win.isMinimized()) watcher.demand('visible', 'visible')
+    else watcher.release('visible')
+  }
+  win.on('show', syncVisible)
+  win.on('hide', syncVisible)
+  win.on('minimize', syncVisible)
+  win.on('restore', syncVisible)
+  syncVisible()
+  // Back from a store's uninstaller: check whether the game is gone.
+  win.on('focus', () => actions.onFocus())
+
+  // A game that started after the launch screen gave up still hides Launchbay, if that's the setting.
+  launcher.on('late-start', () => {
+    if (settings.get().hideAfterLaunch) void windows.hide()
+  })
 
   tray = createTray({
     show: () => windows.showNormal(),

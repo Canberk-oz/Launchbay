@@ -23,18 +23,23 @@ npm run dev          # run with hot reload
 | `npm run typecheck` | Type-checks the main, preload and renderer code |
 | `npm run scan:diagnose` | Runs the three platform scanners without Electron and prints what they find |
 | `npm run icons` | Regenerates the app and tray icons (they are drawn procedurally) |
+| `npm run icons:menu` | Regenerates the right-click menu icons in `resources/menu` from the app's stroke icon family |
 
 > Electron 44 downloads its binary on first run rather than at install time. If that is blocked, run `npx install-electron`.
 > The installer is unsigned, so Windows SmartScreen will ask for confirmation the first time.
 
 ## Using it
 
-- **Browse:** covers stand face-out in a grid (100–320 px, set with the slider) or in a dense list. Filter by All, Steam, Epic or Xbox, and sort by name, recently played or size.
+- **Browse:** covers stand face-out in a grid (100–320 px, set with the slider) or in a dense list. Filter by All, Steam, Epic or Xbox, and sort by name, recently played, size or recently added. "Added" is when a game arrived on this PC: its install folder's creation date, or when Launchbay first found it.
+- **Collections:** group games your own way ("Couch co-op", "Backlog"). Right-click → Collections to tick existing ones or start a new one, or edit them in Properties. Each collection becomes a filter pill after All/Steam/Epic/Xbox. A game can be in several collections, names match regardless of case, and a collection disappears when its last game leaves it.
 - **Favorites:** hover a cover and click its star. Favorites are pinned in their own section above the full library, and they respect the platform filter.
 - **Trailer preview (Steam):** keep the pointer on a cover. A yellow hairline fills for 800 ms, then a muted, looping trailer crossfades in.
-- **Launch:** click a cover. It lifts off the shelf, fills the window and blurs while the store's launcher starts the game. The view returns to the grid once the game is detected, after about 9 seconds without a detection, or immediately with an error on the tile if the hand-off fails.
+- **Launch:** click a cover. It lifts off the shelf, fills the window and blurs while the store's launcher starts the game. The view returns to the grid once the game is detected, after about 9 seconds without a detection (detection carries on in the background), or immediately with an error on the tile if the hand-off fails.
 - **Overlay:** **Ctrl+Shift+G** (configurable) shows Launchbay centered and on top of whatever you're doing, with the cursor already in search. Type, press **Enter** to play the top match, and press the hotkey or Esc to hide it again. Closing the window keeps Launchbay in the tray, so the hotkey still works.
-- **Right-click a game:** Play, Add/Remove favorite, Open install folder, Hide from library. Hidden games can be restored from Settings.
+- **Right-click a game:** Play, Add/Remove favorite, Open install folder, Open store page, Copy launch command, Collections, Hide from library, Uninstall…, Properties…. Open store page appears only when the page can be built: always for Steam and Xbox, and for Epic when the launcher's catalog cache has the game's product slug. Hidden games can be restored from Settings.
+- **Export:** Settings → Libraries exports every game (hidden ones included) as CSV or JSON: name, store, IDs, install folder, launch command, size, playtime, last played, date added, update status, favorite and hidden. Unknown values are left empty (CSV) or `null` (JSON).
+- **Uninstall…** hands the game to its store's own uninstaller after you confirm. Launchbay never deletes files or packages itself. Steam opens its uninstall prompt (`steam://uninstall/<appid>`). The Epic Games Launcher opens on its library, where you choose Uninstall from the game's ⋯ menu (Epic has no documented uninstall link). For Xbox games, Windows Settings opens on Installed apps. Afterwards Launchbay rescans that store every so often, and whenever its window regains focus, until the game is gone.
+- **Properties (Alt+Enter):** a read-only sheet (apart from its collections) with the game's size, playtime, last played, date added, update status, install folder, launch command, IDs and cover source. For Steam games it also shows the screenshots Steam keeps on this PC (newest first); click one to open it in your image viewer. Xbox Game Bar captures aren't shown, because they can't be matched to a game reliably.
 
 | Key | Action |
 | --- | --- |
@@ -44,6 +49,7 @@ npm run dev          # run with hot reload
 | ↓ from search, arrow keys | Move between games |
 | Enter / Space | Launch the focused game |
 | F | Toggle favorite on the focused game |
+| Alt+Enter | Properties of the focused game |
 | Ctrl + / Ctrl − | Larger or smaller tiles |
 | F5 / Ctrl+R | Refresh the library |
 | Ctrl+, | Settings |
@@ -67,16 +73,18 @@ To add GOG Galaxy, Battle.net or Ubisoft Connect, write one of these, register i
 
 - **Steam:** reads `SteamPath` from `HKCU\Software\Valve\Steam` (then `HKLM`, then `C:\Program Files (x86)\Steam`), every library in `steamapps\libraryfolders.vdf` (both file formats), and each `appmanifest_*.acf`. Playtime and last-played come from the local `userdata\<id>\config\localconfig.vdf`. Covers come from the Steam CDN (`library_600x900.jpg`, then `header.jpg`), with Steam's own local `appcache\librarycache` as the offline fallback. Games launch with `steam://run/<appid>`.
 - **Epic:** reads `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item` and skips DLC, engine and plugin entries and incomplete installs. Covers come first from image fields in the manifest, then from the launcher's **local** catalog cache (`Catalog\catcache.bin`, whose image URLs point at Epic's public CDN). Epic's authenticated web API is never called. Games launch with `com.epicgames.launcher://apps/<AppName>?action=launch&silent=true`.
-- **Xbox / Microsoft Store:** runs `Get-AppxPackage` (plus `Get-StartApps` for the names Windows displays), reads each `AppxManifest.xml` and any GDK `MicrosoftGame.config`, and picks out games heuristically. Known system, codec and platform packages are excluded, and a package must then show a game signal: a GDK config, an Xbox Live protocol, an `XboxGames` install folder, or game-engine files. The cover is the package logo asset with the most visible artwork. Transparent logos are printed on a box front with the title below. Games launch through `explorer.exe shell:AppsFolder\<PackageFamilyName>!<AppId>`, using the app's real Application Id from the manifest.
+- **Xbox / Microsoft Store:** runs `Get-AppxPackage` (plus `Get-StartApps` for the names Windows displays), reads each `AppxManifest.xml` and any GDK `MicrosoftGame.config`, and picks out games heuristically. Known system, codec and platform packages are excluded, and a package must then show a game signal: a GDK config, an Xbox Live protocol, an `XboxGames` install folder, or game-engine files. The cover is chosen from the package's own assets in this order: splash screen, large square tile (or GDK `Square480x480Logo`), wide tile, and only then the small icons. It is the first one large enough to look sharp, and 16:9 splash art gives way to croppable square art. Every cover fills its tile: art is cropped to fit, and a logo or icon is centered on the color it was drawn on (its own flat background or the manifest's `BackgroundColor`), or on a blurred, enlarged copy of itself. Games launch through `explorer.exe shell:AppsFolder\<PackageFamilyName>!<AppId>`, using the app's real Application Id from the manifest.
 
-A missing store is skipped silently. A failed cover or trailer lookup is remembered and retried only on **Refresh library**, while the automatic rescan at startup doesn't retry it.
+A missing store is skipped silently. A store that is installed but can't be read (the registry or PowerShell failed, its data folder was unreadable) keeps its last known games until a later scan succeeds. A failed cover or trailer lookup is remembered and retried only on **Refresh library**, while the automatic rescan at startup doesn't retry it.
 
 ## Where the spec met reality
 
 - **Steam trailers are DASH now, not mp4/webm.** As of 2025 the store API (`appdetails`) returns `dash_h264` / `hls_h264` manifests. Launchbay reads the MPD and downloads the init segment plus about 30 s of the smallest video representation that is at least 480p, starting 6 s in to skip studio logos. It rebases the fragments into one small fragmented MP4 (a few MB) and caches it, so the first hover takes about a second and later hovers are instant. If the API ever returns progressive mp4/webm again, those are streamed and cached as well. Lookups are throttled to stay under Steam's rate limit, and the trailer cache is capped at 768 MB (least recently used files are evicted first).
 - **Epic covers** use the launcher's local catalog cache as well as the manifest, because `.item` files carry no image fields in practice.
 - **Xbox detection** needs positive game signals as well as the exclusion list. Otherwise every Store app (WhatsApp, Clipchamp, and so on) would show up as a game. If something is misdetected, right-click it and choose **Hide from library**.
-- **Launch confirmation** watches for a process running from the game's install folder (for Steam, `RunningAppID` in the registry also counts).
+- **Running games** are detected by one long-lived PowerShell process. It polls WMI for running executables (plus Steam's `RunningAppID`) and matches them against each game's install folder. It runs only while Launchbay is visible (every 2 s), while a launch is being confirmed (every 1 s), or while a game it saw start is still running (every 5 s, so it can see the game exit with Launchbay hidden). Otherwise nothing polls. Running games get a "Running" sticker.
+- **Slow starts:** the launch screen waits about 9 s. After that the game is still watched for in the background for 3 minutes, so a slow Game Pass start still gets its Running sticker, and "Hide Launchbay once a game is running" still applies.
+- **Playtime tracked by Launchbay:** Epic and Xbox keep playtime in the cloud, so Launchbay adds up the sessions its watcher saw (30 s or longer). This figure is always labeled "tracked by Launchbay". Games started while Launchbay was closed, or hidden with nothing running, aren't seen. Steam's own playtime is shown as Steam reports it.
 - **Hide Launchbay once a game is running** is on by default, so the overlay gets out of the way. You can turn it off in Settings.
 
 ## Data and privacy
@@ -109,5 +117,6 @@ scripts/         Icon generator, scanner diagnostics
 
 ## Known limitations
 
-- Playtime is available for Steam only. Epic and Xbox keep theirs in the cloud. Install size is not shown for Xbox games.
+- Playtime is available for Steam only. Epic and Xbox keep theirs in the cloud.
+- Xbox games report no install size, so Launchbay measures each install folder in the background, one game at a time, after startup. The result is cached per package version. If Windows denies access to any part of a folder (common under `WindowsApps`), the size is shown as unknown rather than as a partial total.
 - The Epic provider is covered by unit tests but was not run against a live Epic install on the development machine. GDK (PC Game Pass) detection is exercised by tests. Classic Store games (Forager, Solitaire) were verified live.

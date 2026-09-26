@@ -197,7 +197,7 @@ It refuses the category defaults of slate panels, a left rail and blue selection
 - Near-black shelf, colorless chrome, one sticker-yellow accent.
 - Archivo from a single variable family: condensed caps for every label, normal width for game names.
 - Hairline-ruled spec headers with right-aligned counts divide the shelf.
-- Face-out 2:3 covers that lift on hover; transparent logos and missing art become printed box fronts.
+- Face-out 2:3 covers that lift on hover and always fill their tile; missing art becomes a printed box front.
 - Drawn keycaps for every keyboard hint.
 
 ## Colors
@@ -219,7 +219,7 @@ A colorless shell with one warm signal color, plus the platform colors, which ap
 
 ### Tertiary
 - **Recall Red** (#ff6b5b): failure states only (a tile that couldn't launch, error notices, a taken hotkey).
-- **Platform box-front colors**: Steam slate (#2a475e → #1b2838 → #10161f, signal #66c0f4), Epic graphite (#3a3a41 → #1e1e22 → #0f0f11, signal #f2f2f2) and Xbox green (#1c8a1c → #0f5a10 → #082b09, signal #b6f15a). They appear only as 165° gradients on box fronts (missing art, transparent logos) and as the loading ground behind a cover.
+- **Platform box-front colors**: Steam slate (#2a475e → #1b2838 → #10161f, signal #66c0f4), Epic graphite (#3a3a41 → #1e1e22 → #0f0f11, signal #f2f2f2) and Xbox green (#1c8a1c → #0f5a10 → #082b09, signal #b6f15a). They appear only as 165° gradients on box fronts (missing art) and as the loading ground behind a cover or a mark without its own background.
 
 ### Named Rules
 **The One Sticker Rule.** Sticker Yellow marks favorites, focus, the primary-action hint and "on" states. It is never decoration, never a fill for a region, and never used for a second meaning.
@@ -241,7 +241,7 @@ A colorless shell with one warm signal color, plus the platform colors, which ap
 - **Body** (400, 13px, 1.4, tabular lining figures): controls, settings copy, notices.
 - **Label** (650, 11px, +0.09em, uppercase, 72% width): section heads, column heads, sort label, spec-table keys. **Micro** (10px) is the same label at its smallest: tile meta, error stamps, the version line.
 - **Tile Name** (650, clamp(11.5px, 7.4cqw, 15px)): the hover caption, sized to the tile it sits on.
-- **Box Type** (850, 80% width, uppercase, 1.02): titles printed on box fronts, sized in container units so they fill the tile; a smaller cut (clamp(11px, 9cqw, 24px)) sits under a printed logo, and the platform name at the foot is Label at clamp(8px, 5.2cqw, 11px).
+- **Box Type** (850, 80% width, uppercase, 1.02): titles printed on box fronts, sized in container units so they fill the tile, and the platform name at the foot is Label at clamp(8px, 5.2cqw, 11px).
 - **Wordmark** (800, 13px, +0.16em, uppercase, 72% width): "LAUNCHBAY" in the title strip.
 
 ### Named Rules
@@ -307,7 +307,7 @@ The shelf is flat. Only the covers cast shadows, and a cover lifts when it is ho
 - The title strip holds the wordmark, the centered search field and the settings button. The toolbar holds the filter pills plus sort (Label "SORT" and a quiet select), tile size, a grid/list segmented control (active segment on Pressed) and "Refresh library" (its icon spins while scanning).
 
 ### Signature: Box front
-The printed fallback for missing art: a platform gradient with a soft top sheen, the inset frame, the platform mark in its signal color, the name set in Box Type, and the platform name in Label at the foot. Transparent package logos (Store/Xbox) use the same box front, with the logo printed above the name.
+The printed fallback for missing art: a platform gradient with a soft top sheen, the inset frame, the platform mark in its signal color, the name set in Box Type, and the platform name in Label at the foot. Every cover fills its tile edge to edge, framed in one of three ways. Art is cropped to fill. Art too wide to crop (a 16:9 splash, a Steam header) spans the width over a blurred copy of itself. A logo or icon (Store/Xbox package assets) is centered in a box 84% of the tile wide, on the flat color it was drawn on or the package declares, or else on a blurred, enlarged copy of itself.
 
 ### Signature: Launch lift-off
 Clicking a cover (or pressing Enter) FLIPs it from its exact tile rect to cover the window with a uniform scale (520ms, `cubic-bezier(0.25, 0.8, 0.2, 1)`), blurring to about 26px on screen and dimming to 50%. The shelf behind is blurred 14px under a 60% scrim. A disc spins with a yellow glint above the name (Display) and a Label status line ("Starting through Steam" → "Running" / "Handed off to …"), then everything fades back to the shelf (320ms). Esc returns early.

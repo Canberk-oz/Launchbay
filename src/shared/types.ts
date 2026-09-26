@@ -18,6 +18,16 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
  */
 export type TrailerState = 'unknown' | 'available' | 'none'
 
+/**
+ * How a cover fills its 2:3 tile. `art` is cropped to fill it edge to edge.
+ * `band` is art too wide to crop (a 16:9 splash, a Steam header): it spans the
+ * tile's width over a blurred copy of itself. `mark` is a logo or icon on a
+ * plain background: it sits centered on `coverBackground`.
+ */
+export type CoverFrame = 'art' | 'band' | 'mark'
+
+export type SizeStatus = 'known' | 'measuring' | 'denied' | 'failed' | 'unreported'
+
 export interface Game {
   /** Stable id: `${platform}:${platformId}`. */
   id: string
@@ -29,25 +39,55 @@ export interface Game {
   launchCommand: string
   /** `glmedia://` URL of the locally cached cover, or null when none is available. */
   coverImageUrl: string | null
-  /** The cover is a transparent logo (Store packages) rather than full-bleed art. */
-  coverIsLogo: boolean
+  coverFrame: CoverFrame
+  /**
+   * CSS color behind a `mark`: the solid color the asset was drawn on, or the
+   * one its package declares. Null means a blurred, enlarged copy of the image.
+   */
+  coverBackground: string | null
+  /** The cover's glow color (#rrggbb), used for hover and launch; null when the cover is colorless. */
+  coverAmbient: string | null
   /** Direct trailer URL (a Steam DASH manifest or progressive video); Steam only. */
   trailerUrl: string | null
   trailerState: TrailerState
   sizeOnDisk: number | null
+  /**
+   * Why `sizeOnDisk` is or isn't known. `measuring`: Launchbay is walking the
+   * install folder. `denied`: Windows refused access to part of it, so the
+   * size is unknown rather than a partial guess. `failed`: the walk failed.
+   * `unreported`: the store gives no size and there is nothing to measure.
+   */
+  sizeStatus: SizeStatus
+  /** The store's own playtime (Steam). Authoritative; Epic and Xbox don't record one locally. */
   playtimeMinutes: number | null
-  /** Epoch ms of the last scan that saw this game. */
-  lastScanned: number
+  /**
+   * Playtime Launchbay measured itself from the sessions its running-game
+   * watcher saw. Never the store's own figure: show it labeled as tracked by
+   * Launchbay. Null when no session has been seen.
+   */
+  trackedMinutes: number | null
+  /** Launchbay's watcher sees the game running right now. */
+  isRunning: boolean
   isFavorite: boolean
   /** Epoch ms. */
   favoritedAt: number | null
   /** Epoch ms: the later of the platform's own record and launches from Launchbay. */
   lastPlayed: number | null
+  /**
+   * Epoch ms the game arrived on this PC: its install folder's creation time
+   * when Launchbay first saw it, otherwise that moment. Null until the first
+   * scan that finds it.
+   */
+  addedAt: number | null
+  /** The user's collections this game is in (see shared/collections.ts). */
+  tags: string[]
+  /** Steam only: an update is waiting. Null means unknown (Epic and Xbox keep no local record). */
+  updateAvailable: boolean | null
   isHidden: boolean
 }
 
 export type ViewMode = 'grid' | 'list'
-export type SortMode = 'name' | 'recent' | 'size'
+export type SortMode = 'name' | 'recent' | 'size' | 'added'
 
 export const TILE_SIZE_MIN = 100
 export const TILE_SIZE_MAX = 320
@@ -65,6 +105,17 @@ export interface Settings {
   viewMode: ViewMode
   tileSize: number
   sortMode: SortMode
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  hotkey: DEFAULT_HOTKEY,
+  hotkeyEnabled: true,
+  closeToTray: true,
+  hideAfterLaunch: true,
+  launchAtLogin: false,
+  viewMode: 'grid',
+  tileSize: TILE_SIZE_DEFAULT,
+  sortMode: 'name'
 }
 
 export type HotkeyError = 'in-use' | 'invalid'
@@ -95,9 +146,23 @@ export type LaunchResult =
   | { ok: true; confirmed: boolean }
   | { ok: false; error: string }
 
+/**
+ * The games that changed since the previous patch. `upsert` carries whole
+ * records (new or changed); `remove` the ids that left the library. `seq`
+ * increases by one per patch, so the renderer can skip patches its initial
+ * state already includes.
+ */
+export interface LibraryPatch {
+  seq: number
+  upsert: Game[]
+  remove: string[]
+}
+
 export interface InitialState {
   version: string
   games: Game[]
+  /** The last patch already reflected in `games`. */
+  librarySeq: number
   settings: Settings
   scan: ScanStatus
   hotkey: HotkeyStatus
@@ -108,7 +173,41 @@ export interface InitialState {
 /** `overlay`: summoned by the global hotkey; `show`: opened normally (tray, second launch). */
 export type WindowVisibility = 'show' | 'overlay' | 'hide'
 
-export type ContextAction = 'launch'
+/** A message from the main process for the renderer to show as a toast. */
+export interface Notice {
+  tone: 'error' | 'warning' | 'info'
+  title: string
+  message?: string
+}
+
+/** Right-click menu picks the renderer carries out (they start UI there). */
+export type ContextAction = 'launch' | 'properties' | 'new-collection'
+
+/** Extra facts shown in a game's properties, fetched when the panel opens. */
+export interface GameDetails {
+  /** Where the cached cover came from: a URL or a local file path. */
+  coverSource: string | null
+  /** Null when the store keeps no screenshots Launchbay can read (everything but Steam). */
+  screenshots: {
+    /** The newest ones, at most MAX_SCREENSHOTS. */
+    items: Screenshot[]
+    total: number
+  } | null
+}
+
+export const MAX_SCREENSHOTS = 60
+
+export interface Screenshot {
+  /** glmedia:// URL of the thumbnail (or the image itself when there is none). */
+  thumbUrl: string
+  /** glmedia:// URL of the full image; pass it to openScreenshot. */
+  url: string
+  takenAt: number
+}
+
+export type ExportResult =
+  | { saved: true; path: string; count: number }
+  | { saved: false; error?: string } // cancelled, or `error` when writing failed
 
 export interface MediaCacheInfo {
   coverBytes: number

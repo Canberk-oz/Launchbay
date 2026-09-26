@@ -93,7 +93,9 @@
   transform: scale(1.05);
   box-shadow:
     0 3px 6px rgb(0 0 0 / 0.5),
-    0 26px 48px -18px rgb(0 0 0 / 0.9);
+    0 26px 48px -18px rgb(0 0 0 / 0.9),
+    /* The cover's own color, spilling onto the shelf (none for colorless covers). */
+    0 18px 54px -16px color-mix(in srgb, var(--ambient, transparent) 55%, transparent);
 }
 
 .tile:focus-visible {
@@ -208,6 +210,12 @@
   opacity: 0;
 }
 
+/* Beside the platform badge: an update waiting in the store. */
+.tile__badge--update {
+  left: calc(clamp(5px, 4cqw, 8px) + clamp(18px, 12cqw, 24px) + 4px);
+  color: var(--accent);
+}
+
 /* The favorite sticker: appears on hover, stays once the game is a favorite. */
 .tile__star {
   position: absolute;
@@ -303,6 +311,41 @@
   box-shadow: inset 0 0 0 2px var(--danger);
 }
 
+/* A game Launchbay sees running: a lit sticker at the top left. */
+.tile__running {
+  position: absolute;
+  top: clamp(5px, 4cqw, 8px);
+  left: clamp(5px, 4cqw, 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  pointer-events: none;
+}
+
+.tile__running .spec {
+  font-size: var(--text-micro);
+  font-weight: 750;
+}
+
+.tile__running-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-ink);
+  animation: running-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes running-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .tile__error {
   position: absolute;
   top: 8px;
@@ -369,10 +412,36 @@
   opacity: 1;
 }
 
-.cover--wide .cover__img {
+/* Art too wide to crop: full width, centered, over a blurred copy of itself. */
+.cover--band .cover__img {
+  top: 50%;
+  bottom: auto;
+  height: auto;
+  transform: translateY(-50%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.5);
+}
+
+/*
+ * A logo or icon: the tile is filled edge to edge by the color it was drawn on
+ * (or, without one, a blurred and enlarged copy of it), and the mark sits
+ * centered in a box 84% of the tile wide, as large as that allows.
+ */
+.cover--mark {
+  background: var(--cover-bg, linear-gradient(165deg, var(--p1), var(--p2) 55%, var(--p3)));
+}
+
+.cover--mark .cover__img {
+  inset: 0;
+  margin: auto;
+  width: 84cqw;
+  height: 64cqw;
   object-fit: contain;
-  padding: 14% 12%;
-  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.55));
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.35));
+}
+
+/* A mark cut from its own solid plate: a shadow would outline the cut. */
+.cover--mark.has-bg .cover__img {
+  filter: none;
 }
 
 .cover__backdrop {
@@ -382,6 +451,14 @@
   height: 130%;
   object-fit: cover;
   filter: blur(18px) saturate(1.3) brightness(0.55);
+}
+
+/* A small icon scaled well past the tile, so its colors wash across all of it. */
+.cover--mark .cover__backdrop {
+  inset: -40%;
+  width: 180%;
+  height: 180%;
+  filter: blur(26px) saturate(1.5) brightness(0.62);
 }
 
 /* A plain box front for games without art. */
@@ -433,24 +510,6 @@
   overflow: hidden;
 }
 
-.fallback__logo {
-  width: 58cqw;
-  height: 58cqw;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.4));
-}
-
-.fallback--logo {
-  justify-content: flex-start;
-  padding-top: 22cqw;
-  gap: 10cqw;
-}
-
-.fallback--logo .fallback__name {
-  font-size: clamp(11px, 9cqw, 24px);
-  -webkit-line-clamp: 3;
-}
-
 .fallback__platform {
   position: absolute;
   bottom: 9cqw;
@@ -461,7 +520,7 @@
 /* ------------------------------------------------------------- list table */
 
 .library-scroll--list {
-  --cols: 36px minmax(160px, 1fr) 120px 92px 96px 124px 32px;
+  --cols: 36px minmax(160px, 1fr) 120px 124px 96px 124px 104px 32px;
 }
 
 .list-head,
@@ -550,16 +609,6 @@
   display: none;
 }
 
-.row__thumb .fallback--logo {
-  justify-content: center;
-  padding: 0;
-}
-
-.row__thumb .fallback__logo {
-  width: 80cqw;
-  height: 80cqw;
-}
-
 .row__thumb .fallback__frame {
   display: none;
 }
@@ -577,6 +626,35 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.row__num--tracked {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.row__source {
+  color: var(--ink-2);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.row__tag {
+  flex: none;
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--accent);
+  font-size: var(--text-micro);
+}
+
+/* After .row__tag so its colors win. */
+.row__tag--running {
+  background: var(--accent);
+  box-shadow: none;
+  color: var(--accent-ink);
 }
 
 .row__error {
@@ -642,12 +720,24 @@
   color: var(--accent);
 }
 
+/* Narrower: one date column fits. It is Added while sorting by it, else Last played. */
+@media (max-width: 1180px) {
+  .library-scroll--list {
+    --cols: 36px minmax(150px, 1fr) 112px 124px 92px 116px 32px;
+  }
+  .library-scroll--list:not(.is-sorted-by-added) :is(.list-head > :nth-child(7), .row__added),
+  .library-scroll--list.is-sorted-by-added :is(.list-head > :nth-child(6), .row__when) {
+    display: none;
+  }
+}
+
 @media (max-width: 980px) {
   .library-scroll--list {
-    --cols: 36px minmax(140px, 1fr) 104px 84px 88px 32px;
+    --cols: 36px minmax(140px, 1fr) 104px 124px 88px 32px;
   }
-  .list-head > :nth-child(6),
-  .row__when {
+  .list-head > :is(:nth-child(6), :nth-child(7)),
+  .row__when,
+  .row__added {
     display: none;
   }
 }
@@ -743,7 +833,32 @@
   color: var(--ink-2);
 }
 
+/* A long value (a path, a command): stacked under its label, wrapping, selectable. */
+.spec-table__row--long {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  height: auto;
+  min-height: 36px;
+  padding: 9px 0;
+}
+
+.spec-table__row--long dd {
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.is-selectable {
+  user-select: text;
+  cursor: text;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .tile__running-dot {
+    animation: none;
+  }
   .tile,
   .tile:hover,
   .tile:focus-visible,

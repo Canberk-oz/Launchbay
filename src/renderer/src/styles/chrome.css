@@ -304,6 +304,30 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* Many collections scroll sideways rather than squeezing the controls. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+
+.filters > .pill {
+  flex: none;
+}
+
+/* Stores | collections */
+.filters__rule {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--rule-2);
+}
+
+.pill--collection .pill__label {
+  max-width: 14em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Capsule filter with a count chip; the chip inverts when the filter is on. */

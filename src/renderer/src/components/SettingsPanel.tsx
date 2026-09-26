@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PLATFORM_LABELS, PLATFORMS, type MediaCacheInfo, type Settings } from '@shared/types'
-import { closeSettings, refreshLibrary, unhideGame, updateSettings } from '../actions'
+import { closeSettings, exportLibrary, openDiskUsage, refreshLibrary, unhideGame, updateSettings } from '../actions'
 import { formatBytes, formatRelative, plural } from '../lib/format'
 import { useStore } from '../store'
 import { HotkeyRecorder } from './HotkeyRecorder'
-import { CloseIcon, PlatformMark, RefreshIcon } from './Icons'
+import { PlatformMark, RefreshIcon } from './Icons'
+import { Sheet, SheetBlock as Block } from './Sheet'
 
 const api = window.launchbay
 
@@ -38,18 +39,6 @@ function Toggle({
         <span className="switch__knob" />
       </button>
     </label>
-  )
-}
-
-function Block({ title, children }: { title: string; children: React.ReactNode }): React.JSX.Element {
-  return (
-    <section className="spec-block">
-      <div className="spec-block__head">
-        <h3 className="spec">{title}</h3>
-        <span className="spec-block__rule" aria-hidden="true" />
-      </div>
-      {children}
-    </section>
   )
 }
 
@@ -125,6 +114,23 @@ function SettingsBody(): React.JSX.Element {
             {scan.scanning ? 'Scanning…' : 'Refresh library'}
           </button>
         </div>
+        <div className="spec-block__foot">
+          <span className="muted">Where the disk space goes, by store and drive.</span>
+          <button className="btn" onClick={openDiskUsage}>
+            Disk usage
+          </button>
+        </div>
+        <div className="spec-block__foot">
+          <span className="muted">Export every game, hidden ones included.</span>
+          <span className="spec-block__actions">
+            <button className="btn" onClick={() => void exportLibrary('csv')}>
+              Export CSV
+            </button>
+            <button className="btn" onClick={() => void exportLibrary('json')}>
+              Export JSON
+            </button>
+          </span>
+        </div>
         {hidden.length > 0 && (
           <div className="hidden-list">
             <h4 className="spec hidden-list__title">Hidden · {hidden.length}</h4>
@@ -176,59 +182,12 @@ function SettingsBody(): React.JSX.Element {
   )
 }
 
-/** A side sheet, so the library stays visible behind it. */
-export function SettingsPanel(): React.JSX.Element | null {
+/** Settings, in a side sheet so the library stays visible behind it. */
+export function SettingsPanel(): React.JSX.Element {
   const open = useStore((s) => s.settingsOpen)
-  const [mounted, setMounted] = useState(open)
-  const panel = useRef<HTMLElement>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    if (open) {
-      returnFocus.current = document.activeElement as HTMLElement | null
-      setMounted(true)
-      return
-    }
-    const t = setTimeout(() => setMounted(false), 220)
-    returnFocus.current?.focus?.()
-    return () => clearTimeout(t)
-  }, [open])
-
-  useEffect(() => {
-    if (open && mounted) panel.current?.querySelector<HTMLElement>('button, [href], input')?.focus()
-  }, [open, mounted])
-
-  if (!mounted) return null
-
   return (
-    <div className={`sheet-layer${open ? ' is-open' : ''}`}>
-      <div className="sheet-scrim" onClick={closeSettings} />
-      <aside
-        className="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        ref={panel}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            e.stopPropagation()
-            closeSettings()
-          }
-        }}
-      >
-        <header className="sheet__head">
-          <h2 id="settings-title" className="sheet__title">
-            Settings
-          </h2>
-          <button className="icon-btn" aria-label="Close settings" onClick={closeSettings}>
-            <CloseIcon size={18} />
-          </button>
-        </header>
-        <div className="sheet__body">
-          <SettingsBody />
-        </div>
-      </aside>
-    </div>
+    <Sheet open={open} title="Settings" onClose={closeSettings}>
+      <SettingsBody />
+    </Sheet>
   )
 }
