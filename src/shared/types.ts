@@ -70,6 +70,8 @@ export interface Game {
    * scan that finds it.
    */
   addedAt: number | null
+  /** The user's collections this game is in (see shared/collections.ts). */
+  tags: string[]
   /** Steam only: an update is waiting. Null means unknown (Epic and Xbox keep no local record). */
   updateAvailable: boolean | null
   isHidden: boolean
@@ -170,7 +172,7 @@ export interface Notice {
 }
 
 /** Right-click menu picks the renderer carries out (they start UI there). */
-export type ContextAction = 'launch' | 'properties'
+export type ContextAction = 'launch' | 'properties' | 'new-collection'
 
 /** Extra facts shown in a game's properties, fetched when the panel opens. */
 export interface GameDetails {

@@ -7,6 +7,7 @@ export const IPC = {
   refreshLibrary: 'library:refresh',
   setFavorite: 'game:set-favorite',
   setHidden: 'game:set-hidden',
+  setCollections: 'game:set-collections',
   launchGame: 'game:launch',
   getTrailer: 'game:get-trailer',
   showContextMenu: 'game:show-context-menu',

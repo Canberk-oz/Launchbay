@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import markUrl from '../assets/mark.png'
 import { launchGame, openSettings } from '../actions'
-import { buildSections } from '../lib/library'
+import { buildSections, filterCollection, filterTitle, matchesFilter } from '../lib/library'
 import { useStore } from '../store'
 import { CloseIcon, EnterIcon, SearchIcon, SlidersIcon } from './Icons'
 import { Keys } from './Keys'
@@ -9,7 +9,7 @@ import { Keys } from './Keys'
 function SearchField(): React.JSX.Element {
   const search = useStore((s) => s.search)
   const games = useStore((s) => s.games)
-  const platform = useStore((s) => s.platform)
+  const filter = useStore((s) => s.filter)
   const sort = useStore((s) => s.settings.sortMode)
   const focusTick = useStore((s) => s.focusSearchTick)
   const input = useRef<HTMLInputElement>(null)
@@ -20,14 +20,11 @@ function SearchField(): React.JSX.Element {
     input.current?.select()
   }, [focusTick])
 
-  const total = useMemo(
-    () => games.filter((g) => !g.isHidden && (platform === 'all' || g.platform === platform)).length,
-    [games, platform]
-  )
+  const total = useMemo(() => games.filter((g) => !g.isHidden && matchesFilter(g, filter)).length, [games, filter])
   const topMatch = useMemo(() => {
     if (!search.trim()) return null
-    return buildSections(games, { search, platform, sort })[0]?.games[0] ?? null
-  }, [games, search, platform, sort])
+    return buildSections(games, { search, filter, sort })[0]?.games[0] ?? null
+  }, [games, search, filter, sort])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter' && topMatch) {
@@ -49,7 +46,7 @@ function SearchField(): React.JSX.Element {
     }
   }
 
-  const noun = platform === 'all' ? 'games' : `${platform === 'steam' ? 'Steam' : platform === 'epic' ? 'Epic' : 'Xbox'} games`
+  const noun = filter === 'all' ? 'games' : filterCollection(filter) !== null ? `games in ${filterCollection(filter)}` : filterTitle(filter)
 
   return (
     <div className="search" data-has-query={search ? '' : undefined}>

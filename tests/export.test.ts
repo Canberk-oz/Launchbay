@@ -7,7 +7,7 @@ const base: Game = {
   id: 'steam:620', platform: 'steam', platformId: '620', name: 'Portal 2', installPath: 'D:\\Steam\\steamapps\\common\\Portal 2',
   launchCommand: 'steam://run/620', coverImageUrl: null, coverFrame: 'art', coverBackground: null, coverAmbient: null, trailerUrl: null,
   trailerState: 'none', sizeOnDisk: 12_000_000_000, sizeStatus: 'known', playtimeMinutes: 754, isFavorite: true, favoritedAt: 1, lastPlayed: Date.UTC(2026, 8, 1),
-  addedAt: Date.UTC(2024, 0, 2), updateAvailable: false, isHidden: false
+  addedAt: Date.UTC(2024, 0, 2), tags: [], updateAvailable: false, isHidden: false
 }
 const xbox: Game = { ...base, id: 'xbox:Foo_8wek', platform: 'xbox', platformId: 'Foo_8wek', name: 'Forza "Horizon", 5', installPath: 'C:\\XboxGames\\Forza',
   launchCommand: 'shell:AppsFolder\\Foo_8wek!App', sizeOnDisk: null, sizeStatus: 'denied', playtimeMinutes: null, lastPlayed: null, addedAt: null, updateAvailable: null, isFavorite: false, isHidden: true }

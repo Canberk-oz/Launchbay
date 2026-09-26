@@ -15,6 +15,7 @@ const api: LaunchbayApi = {
   refreshLibrary: () => ipcRenderer.invoke(IPC.refreshLibrary),
   setFavorite: (id, favorite) => ipcRenderer.invoke(IPC.setFavorite, id, favorite),
   setHidden: (id, hidden) => ipcRenderer.invoke(IPC.setHidden, id, hidden),
+  setCollections: (id, names) => ipcRenderer.invoke(IPC.setCollections, id, names),
   launchGame: (id) => ipcRenderer.invoke(IPC.launchGame, id),
   getTrailer: (id) => ipcRenderer.invoke(IPC.getTrailer, id),
   showContextMenu: (id) => ipcRenderer.invoke(IPC.showContextMenu, id),

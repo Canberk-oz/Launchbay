@@ -22,6 +22,7 @@ export interface LaunchbayApi {
   refreshLibrary(): Promise<void>
   setFavorite(id: string, favorite: boolean): Promise<void>
   setHidden(id: string, hidden: boolean): Promise<void>
+  setCollections(id: string, names: string[]): Promise<void>
   launchGame(id: string): Promise<LaunchResult>
   getTrailer(id: string): Promise<{ src: string } | null>
   showContextMenu(id: string): Promise<void>

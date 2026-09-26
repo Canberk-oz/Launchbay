@@ -48,6 +48,7 @@ function game(partial: Partial<Game>): Game {
     favoritedAt: null,
     lastPlayed: null,
     addedAt: null,
+    tags: [],
     updateAvailable: null,
     isHidden: false,
     ...partial
@@ -61,19 +62,19 @@ test('sections: favorites pinned above the library, filtered by platform, merged
     game({ name: 'Forager', platform: 'xbox', isFavorite: true, favoritedAt: 20 }),
     game({ name: 'Hidden One', isHidden: true })
   ]
-  const all = buildSections(games, { search: '', platform: 'all', sort: 'name' })
+  const all = buildSections(games, { search: '', filter: 'all', sort: 'name' })
   assert.deepEqual(all.map((s) => s.title), ['Favorites', 'All games'])
   assert.deepEqual(all[0].games.map((g) => g.name), ['Forager', 'Hollow Knight']) // newest favorite first
   assert.deepEqual(all[1].games.map((g) => g.name), ['Forager', 'Hollow Knight', 'Portal'])
 
-  const steam = buildSections(games, { search: '', platform: 'steam', sort: 'recent' })
+  const steam = buildSections(games, { search: '', filter: 'steam', sort: 'recent' })
   assert.deepEqual(steam[0].games.map((g) => g.name), ['Hollow Knight'])
   assert.deepEqual(steam[1].games.map((g) => g.name), ['Hollow Knight', 'Portal'])
 
-  const found = buildSections(games, { search: 'KNİGHT', platform: 'all', sort: 'name' })
+  const found = buildSections(games, { search: 'KNİGHT', filter: 'all', sort: 'name' })
   assert.deepEqual(found.map((s) => s.title), ['Results'])
   assert.equal(searchKey('Çağrı ı'), 'cagri i')
-  assert.deepEqual(buildSections(games, { search: 'zzz', platform: 'all', sort: 'name' }), [])
+  assert.deepEqual(buildSections(games, { search: 'zzz', filter: 'all', sort: 'name' }), [])
 })
 
 test('image sniffing', () => {
@@ -121,7 +122,7 @@ test('sections: "Recently added" puts the newest arrivals first, undated games l
     game({ name: 'New', addedAt: 300 }),
     game({ name: 'Mid', addedAt: 200 })
   ]
-  const [all] = buildSections(games, { search: '', platform: 'all', sort: 'added' })
+  const [all] = buildSections(games, { search: '', filter: 'all', sort: 'added' })
   assert.deepEqual(all.games.map((g) => g.name), ['New', 'Mid', 'Old', 'Undated'])
 })
 
@@ -147,4 +148,32 @@ test('disk usage: totals by store and drive keep unknown and measuring counts be
   assert.deepEqual(u.byDrive.map((g) => [g.key, g.bytes, g.games]), [['D:', 100, 2], ['E:', 50, 1], ['C:', 10, 2]])
   assert.deepEqual(u.largest.map((g) => g.name), ['Big', 'Alan', 'Small'])
   assert.deepEqual(u.unknown.map((g) => g.name), ['Halo']) // measuring is not "unknown" yet
+})
+
+test('collections: names are cleaned, matched regardless of case, and take the existing spelling', async () => {
+  const { cleanCollections, collectionsOf, normalizeCollection } = await import('../src/shared/collections')
+  assert.equal(normalizeCollection('  Co-op \t with   friends \n'), 'Co-op with friends')
+  assert.equal(normalizeCollection('   '), null)
+  assert.equal(normalizeCollection('x'.repeat(60))?.length, 40)
+  assert.deepEqual(cleanCollections(['rpg', 'RPG', ' Couch ', ''], ['RPG']), ['RPG', 'Couch'])
+  assert.deepEqual(
+    collectionsOf([
+      { tags: ['RPG', 'Couch'], isHidden: false },
+      { tags: ['rpg'], isHidden: true },
+      { tags: ['Backlog'], isHidden: false }
+    ]),
+    [{ name: 'Backlog', count: 1 }, { name: 'Couch', count: 1 }, { name: 'RPG', count: 1 }] // hidden games don't count
+  )
+})
+
+test('sections: a collection filter shows its games under the collection name', async () => {
+  const { collectionFilter } = await import('../src/renderer/src/lib/library')
+  const games = [
+    game({ name: 'Hades', tags: ['Roguelikes'] }),
+    game({ name: 'Dead Cells', platform: 'epic', tags: ['roguelikes', 'Couch'] }),
+    game({ name: 'Portal', tags: [] })
+  ]
+  const [section] = buildSections(games, { search: '', filter: collectionFilter('Roguelikes'), sort: 'name' })
+  assert.equal(section.title, 'Roguelikes')
+  assert.deepEqual(section.games.map((g) => g.name), ['Dead Cells', 'Hades'])
 })

@@ -4,6 +4,7 @@
 import { EventEmitter } from 'node:events'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
+import { cleanCollections, collectionsOf } from '@shared/collections'
 import type { Game, LibraryPatch, Platform, ScanStatus, SizeStatus } from '@shared/types'
 import { providerFor, providers } from '../providers'
 import type { CoverSource, GameProvider, ScannedGame } from '../providers/types'
@@ -35,6 +36,8 @@ interface UserGameState {
   hidden?: boolean
   /** Epoch ms the game arrived on this PC; cleared when a successful scan no longer finds it. */
   addedAt?: number
+  /** Collections the game is in. Kept when the game is uninstalled, like favorites. */
+  tags?: string[]
 }
 
 interface UserData {
@@ -279,6 +282,22 @@ export class LibraryService extends EventEmitter {
     this.touch(id)
   }
 
+  /** Every collection in use, with its visible game count. */
+  collections(): ReturnType<typeof collectionsOf> {
+    return collectionsOf(this.list())
+  }
+
+  /** Replaces a game's collections; names matching an existing collection take its spelling. */
+  setCollections(id: string, names: readonly string[]): void {
+    const known = this.collections().map((c) => c.name)
+    const tags = cleanCollections(names, known)
+    const state = this.userState(id)
+    if (tags.length) state.tags = tags
+    else delete state.tags
+    this.user.save()
+    this.touch(id)
+  }
+
   markPlayed(id: string): void {
     this.userState(id).lastPlayed = Date.now()
     this.user.save()
@@ -320,6 +339,7 @@ export class LibraryService extends EventEmitter {
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,
       lastPlayed,
       addedAt: user.addedAt ?? null,
+      tags: Array.isArray(user.tags) ? user.tags.filter((t): t is string => typeof t === 'string') : [],
       // Caches written before this field existed have no value: unknown until the next scan.
       updateAvailable: g.updateAvailable ?? null,
       isHidden: !!user.hidden

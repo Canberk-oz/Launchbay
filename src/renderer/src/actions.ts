@@ -58,6 +58,12 @@ export function toggleFavorite(game: Game): void {
   void api.setFavorite(game.id, favorite)
 }
 
+/** Replaces a game's collections, shown at once and confirmed by the next library patch. */
+export function setCollections(game: Game, names: string[]): void {
+  set((s) => ({ games: s.games.map((g) => (g.id === game.id ? { ...g, tags: names } : g)) }))
+  void api.setCollections(game.id, names)
+}
+
 export function unhideGame(id: string): void {
   set((s) => ({ games: s.games.map((g) => (g.id === id ? { ...g, isHidden: false } : g)) }))
   void api.setHidden(id, false)
@@ -85,14 +91,14 @@ export async function exportLibrary(format: 'json' | 'csv'): Promise<void> {
 }
 
 // One sheet at a time: opening one closes the others.
-const NO_SHEET = { settingsOpen: false, propertiesId: null, diskUsageOpen: false }
+const NO_SHEET = { settingsOpen: false, propertiesId: null, propertiesFocus: null, diskUsageOpen: false }
 
 export function openSettings(): void {
   set({ ...NO_SHEET, settingsOpen: true })
 }
 
-export function openProperties(id: string): void {
-  set({ ...NO_SHEET, propertiesId: id })
+export function openProperties(id: string, focus: 'collections' | null = null): void {
+  set({ ...NO_SHEET, propertiesId: id, propertiesFocus: focus })
 }
 
 export function openDiskUsage(): void {

@@ -322,6 +322,109 @@
 }
 
 /* Properties: the game's cover and name above its spec blocks. */
+.collections {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.collections__empty {
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-radius: 13px;
+  background: var(--layer-2);
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.chip__label {
+  max-width: 16em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chip__remove {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.chip__remove:hover,
+.chip__remove:focus-visible {
+  background: var(--rule-2);
+  color: var(--ink);
+}
+
+.chip--add {
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.chip--add:hover,
+.chip--add:focus-visible {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink-2);
+}
+
+.collections__add {
+  display: flex;
+  gap: 8px;
+}
+
+.collections__suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.text-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .props-head {
   display: flex;
   align-items: center;

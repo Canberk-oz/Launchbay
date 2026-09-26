@@ -9,7 +9,7 @@ import {
   type ScanStatus,
   type Settings
 } from '@shared/types'
-import { applyLibraryPatch, type PlatformFilter } from './lib/library'
+import { applyLibraryPatch, type LibraryFilter } from './lib/library'
 
 export interface Toast {
   id: number
@@ -50,10 +50,12 @@ export interface AppState {
   hotkey: HotkeyStatus
   scan: ScanStatus
   search: string
-  platform: PlatformFilter
+  filter: LibraryFilter
   settingsOpen: boolean
   /** The game whose properties sheet is open. */
   propertiesId: string | null
+  /** Set when Properties opened to add a collection: that input takes focus. */
+  propertiesFocus: 'collections' | null
   diskUsageOpen: boolean
   launch: LaunchState | null
   toasts: Toast[]
@@ -76,9 +78,10 @@ export const useStore = create<AppState>(() => ({
   hotkey: { accelerator: DEFAULT_HOTKEY, enabled: true, registered: false, error: null },
   scan: { scanning: false, lastScanAt: null },
   search: '',
-  platform: 'all',
+  filter: 'all',
   settingsOpen: false,
   propertiesId: null,
+  propertiesFocus: null,
   diskUsageOpen: false,
   launch: null,
   toasts: [],

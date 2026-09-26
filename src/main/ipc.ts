@@ -47,6 +47,10 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(IPC.setHidden, (_e, id: unknown, value: unknown) => actions.setHidden(asString(id), value === true))
 
+  ipcMain.handle(IPC.setCollections, (_e, id: unknown, names: unknown) =>
+    actions.setCollections(asString(id), Array.isArray(names) ? names.filter((n): n is string => typeof n === 'string') : [])
+  )
+
   ipcMain.handle(IPC.launchGame, (_e, id: unknown) => actions.launch(asString(id)))
 
   ipcMain.handle(IPC.getTrailer, async (_e, id: unknown) => {

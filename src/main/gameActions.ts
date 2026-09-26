@@ -9,6 +9,7 @@ import {
   type NativeImage
 } from 'electron'
 import { EventEmitter } from 'node:events'
+import { sameCollection } from '@shared/collections'
 import type { ContextAction, Game, GameDetails, LaunchResult, Notice } from '@shared/types'
 import type { LaunchService } from './launch'
 import type { LibraryService } from './library/library'
@@ -20,10 +21,16 @@ import { resourcePath } from './window'
 
 const log = createLogger('actions')
 
-type MenuIcon = 'play' | 'star' | 'star-filled' | 'folder' | 'store' | 'copy' | 'hide' | 'properties'
+type MenuIcon = 'play' | 'star' | 'star-filled' | 'folder' | 'store' | 'copy' | 'hide' | 'properties' | 'collection'
+
+/** A submenu item: a plain action, or a checkbox when `checked` is set. */
+export type MenuCheck = { label: string; checked?: boolean; run: (game: Game) => void } | 'separator'
 
 /** A right-click menu entry; `run` receives the game it was opened on. */
-export type MenuEntry = { label: string; icon: MenuIcon; run: (game: Game) => void } | 'separator'
+export type MenuEntry =
+  | { label: string; icon: MenuIcon; run: (game: Game) => void }
+  | { label: string; icon: MenuIcon; submenu: MenuCheck[] }
+  | 'separator'
 
 /**
  * Everything a user can do to a game, in one place. Tiles, keyboard shortcuts
@@ -65,6 +72,18 @@ export class GameActions extends EventEmitter {
 
   setHidden(id: string, hidden: boolean): void {
     if (this.library.get(id)) this.library.setHidden(id, hidden)
+  }
+
+  setCollections(id: string, names: readonly string[]): void {
+    if (this.library.get(id)) this.library.setCollections(id, names)
+  }
+
+  /** Adds the game to a collection, or takes it out. */
+  toggleCollection(id: string, name: string): void {
+    const game = this.library.get(id)
+    if (!game) return
+    const inIt = game.tags.some((t) => sameCollection(t, name))
+    this.setCollections(id, inIt ? game.tags.filter((t) => !sameCollection(t, name)) : [...game.tags, name])
   }
 
   async openInstallFolder(id: string): Promise<void> {
@@ -118,6 +137,17 @@ export class GameActions extends EventEmitter {
     entries.push(
       { label: 'Copy launch command', icon: 'copy', run: (g) => this.copyLaunchCommand(g.id) },
       'separator',
+      {
+        label: 'Collections',
+        icon: 'collection',
+        submenu: [
+          ...this.library.collections().map(
+            (c): MenuCheck => ({ label: c.name, checked: game.tags.some((t) => sameCollection(t, c.name)), run: (g) => this.toggleCollection(g.id, c.name) })
+          ),
+          ...(this.library.collections().length ? (['separator'] as const) : []),
+          { label: 'New collection…', run: (g) => toRenderer('new-collection', g.id) }
+        ]
+      },
       { label: 'Hide from library', icon: 'hide', run: (g) => this.setHidden(g.id, true) },
       { label: 'Properties…', icon: 'properties', run: (g) => toRenderer('properties', g.id) }
     )
@@ -127,10 +157,18 @@ export class GameActions extends EventEmitter {
   showMenu(id: string, win: BrowserWindow, toRenderer: (action: ContextAction, id: string) => void): void {
     const game = this.library.get(id)
     if (!game) return
+    const sub = (item: MenuCheck): MenuItemConstructorOptions =>
+      item === 'separator'
+        ? { type: 'separator' }
+        : item.checked === undefined
+          ? { label: item.label, click: () => item.run(game) }
+          : { label: item.label, type: 'checkbox', checked: item.checked, click: () => item.run(game) }
     const template: MenuItemConstructorOptions[] = this.menuEntries(game, toRenderer).map((entry) =>
       entry === 'separator'
         ? { type: 'separator' }
-        : { label: entry.label, icon: menuIcon(entry.icon), click: () => entry.run(game) }
+        : 'submenu' in entry
+          ? { label: entry.label, icon: menuIcon(entry.icon), submenu: entry.submenu.map(sub) }
+          : { label: entry.label, icon: menuIcon(entry.icon), click: () => entry.run(game) }
     )
     Menu.buildFromTemplate(template).popup({ window: win })
   }

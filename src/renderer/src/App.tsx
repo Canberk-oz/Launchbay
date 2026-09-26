@@ -34,6 +34,8 @@ function useMainProcessEvents(setAnim: (a: 'in' | 'out' | null) => void): void {
       api.onNotice((notice) => pushToast(notice, notice.tone === 'error' ? 8000 : 3200)),
       api.onContextAction(({ action, id }) => {
         if (action === 'properties') return openProperties(id)
+        if (action === 'new-collection') return openProperties(id, 'collections')
+        if (action !== 'launch') return
         const game = useStore.getState().games.find((g) => g.id === id)
         if (game) void launchGame(game, document.querySelector(`[data-game-id="${CSS.escape(id)}"] .cover-host`))
       }),
