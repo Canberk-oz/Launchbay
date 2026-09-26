@@ -64,6 +64,7 @@ export const GameTile = memo(function GameTile({ game, error, launching }: GameT
       role="button"
       tabIndex={0}
       data-game-id={game.id}
+      style={game.coverAmbient ? ({ '--ambient': game.coverAmbient } as React.CSSProperties) : undefined}
       aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.isFavorite ? ', favorite' : ''}${game.updateAvailable ? ', update ready' : ''}`}
       onPointerEnter={preview.onPointerEnter}
       onPointerLeave={preview.onPointerLeave}

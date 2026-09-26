@@ -14,7 +14,8 @@ import { directorySize, JsonStore, pathExists, writeFileAtomic } from '../util/f
 import { HttpError, httpGet, httpGetBuffer, httpGetText, isTransientError } from '../util/http'
 import { createLimiter, sleep } from '../util/concurrency'
 import { createLogger } from '../util/log'
-import { analyzeArtwork, type Artwork } from './artwork'
+import { ambientColor, analyzeArtwork, type Artwork } from './artwork'
+import { ambientOfColor } from './ambient'
 import { pickArtwork } from './framing'
 import { planDashPreview, rebaseFragments } from './dash'
 
@@ -31,6 +32,8 @@ type CoverRecord =
       /** Missing on records from before framing existed; those are re-analyzed on the next sync. */
       frame?: CoverFrame
       background?: string
+      /** Undefined on records from before ambient colors; null when the cover is colorless. */
+      ambient?: string | null
     }
   | { status: 'failed'; error: string; updatedAt: number }
 
@@ -146,7 +149,15 @@ export class MediaService extends EventEmitter {
         const record = this.state.covers[game.id]
         let work = (): Promise<void> => this.fetchCover(game)
         if (record?.status === 'ok' && (await pathExists(join(this.coversDir, record.file)))) {
-          if (record.frame) return
+          if (record.frame && record.ambient !== undefined) return
+          if (record.frame) {
+            // Framed before ambient colors: read the color from the cached file, no network.
+            const job = this.coverLimit(() => this.addAmbient(game.id, record))
+              .catch((err) => log.warn(`ambient color for ${game.id} failed`, err))
+              .finally(() => this.coverJobs.delete(game.id))
+            this.coverJobs.set(game.id, job)
+            return
+          }
           // Cached before covers were framed. Downloaded art only needs its
           // pixels re-read; local picks (package logos) are chosen again.
           work = /^https?:/i.test(record.source)
@@ -181,6 +192,20 @@ export class MediaService extends EventEmitter {
   coverBackground(id: string): string | null {
     const record = this.state.covers[id]
     return record?.status === 'ok' ? (record.background ?? null) : null
+  }
+
+  /** Adds the ambient color to a cover cached before ambient colors existed; leaves its frame alone. */
+  private async addAmbient(id: string, record: Extract<CoverRecord, { status: 'ok' }>): Promise<void> {
+    const ambient = ambientColor(await fs.readFile(join(this.coversDir, record.file)))
+    const current = this.state.covers[id]
+    if (current?.status !== 'ok' || current.file !== record.file) return // replaced meanwhile
+    current.ambient = ambient
+    this.changed(id)
+  }
+
+  coverAmbient(id: string): string | null {
+    const record = this.state.covers[id]
+    return record?.status === 'ok' ? (record.ambient ?? null) : null
   }
 
   private async reframeCover(id: string, record: Extract<CoverRecord, { status: 'ok' }>): Promise<void> {
@@ -226,8 +251,10 @@ export class MediaService extends EventEmitter {
         if (best) {
           art = best.art
           origin = best.path
-          // A transparent mark takes the color its package declares for it.
-          if (art.frame === 'mark' && !art.background && best.background) art = { ...art, background: best.background }
+          // A transparent mark takes the color its package declares for it (and glows in it if colorless).
+          if (art.frame === 'mark' && !art.background && best.background) {
+            art = { ...art, background: best.background, ambient: art.ambient ?? ambientOfColor(best.background) }
+          }
         }
       }
       if (art && art.data.length >= 256) {
@@ -252,7 +279,8 @@ export class MediaService extends EventEmitter {
       source: origin,
       updatedAt: Date.now(),
       frame: art.frame,
-      ...(art.background ? { background: art.background } : {})
+      ...(art.background ? { background: art.background } : {}),
+      ambient: art.ambient
     }
     this.changed(id)
   }

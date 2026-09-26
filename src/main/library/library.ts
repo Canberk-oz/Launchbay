@@ -284,6 +284,7 @@ export class LibraryService extends EventEmitter {
       coverImageUrl: this.media.coverUrl(g.id),
       coverFrame: this.media.coverFrame(g.id),
       coverBackground: this.media.coverBackground(g.id),
+      coverAmbient: this.media.coverAmbient(g.id),
       trailerUrl: this.media.trailerUrl(g.id),
       trailerState: providerFor(g.platform).resolveTrailer ? this.media.trailerState(g.id) : 'none',
       sizeOnDisk: g.sizeOnDisk,

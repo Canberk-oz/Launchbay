@@ -38,6 +38,7 @@ function game(partial: Partial<Game>): Game {
     coverImageUrl: null,
     coverFrame: 'art',
     coverBackground: null,
+    coverAmbient: null,
     trailerUrl: null,
     trailerState: 'none',
     sizeOnDisk: null,

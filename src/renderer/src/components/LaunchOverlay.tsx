@@ -97,7 +97,12 @@ function Scene({ launch }: { launch: LaunchState }): React.JSX.Element {
   }, [])
 
   return (
-    <div className="launch" data-phase={launch.phase} data-status={launch.status}>
+    <div
+      className="launch"
+      data-phase={launch.phase}
+      data-status={launch.status}
+      style={launch.game.coverAmbient ? ({ '--ambient': launch.game.coverAmbient } as React.CSSProperties) : undefined}
+    >
       <div className="launch__backdrop" />
       <div className="launch__cover" ref={cover}>
         <Cover game={launch.game} />

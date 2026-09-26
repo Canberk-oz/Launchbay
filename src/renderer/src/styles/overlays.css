@@ -18,7 +18,9 @@
 .launch__backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(8 8 10 / 0.6);
+  background:
+    radial-gradient(70% 60% at 50% 55%, color-mix(in srgb, var(--ambient, transparent) 22%, transparent), transparent 75%),
+    rgb(8 8 10 / 0.6);
   backdrop-filter: blur(14px) saturate(0.8);
   animation: fade-in 300ms var(--ease-out) both;
 }

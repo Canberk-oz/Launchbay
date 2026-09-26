@@ -43,6 +43,8 @@ export interface Game {
    * one its package declares. Null means a blurred, enlarged copy of the image.
    */
   coverBackground: string | null
+  /** The cover's glow color (#rrggbb), used for hover and launch; null when the cover is colorless. */
+  coverAmbient: string | null
   /** Direct trailer URL (a Steam DASH manifest or progressive video); Steam only. */
   trailerUrl: string | null
   trailerState: TrailerState

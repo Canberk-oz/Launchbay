@@ -5,7 +5,7 @@ import type { Game } from '../src/shared/types'
 
 const base: Game = {
   id: 'steam:620', platform: 'steam', platformId: '620', name: 'Portal 2', installPath: 'D:\\Steam\\steamapps\\common\\Portal 2',
-  launchCommand: 'steam://run/620', coverImageUrl: null, coverFrame: 'art', coverBackground: null, trailerUrl: null,
+  launchCommand: 'steam://run/620', coverImageUrl: null, coverFrame: 'art', coverBackground: null, coverAmbient: null, trailerUrl: null,
   trailerState: 'none', sizeOnDisk: 12_000_000_000, playtimeMinutes: 754, isFavorite: true, favoritedAt: 1, lastPlayed: Date.UTC(2026, 8, 1),
   addedAt: Date.UTC(2024, 0, 2), updateAvailable: false, isHidden: false
 }
