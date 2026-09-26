@@ -1,5 +1,6 @@
 import type {
   ContextAction,
+  GameDetails,
   HotkeyChangeResult,
   HotkeyStatus,
   InitialState,
@@ -22,6 +23,7 @@ export interface LaunchbayApi {
   launchGame(id: string): Promise<LaunchResult>
   getTrailer(id: string): Promise<{ src: string } | null>
   showContextMenu(id: string): Promise<void>
+  getGameDetails(id: string): Promise<GameDetails | null>
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   setHotkey(accelerator: string): Promise<HotkeyChangeResult>
   suspendHotkey(suspended: boolean): Promise<void>

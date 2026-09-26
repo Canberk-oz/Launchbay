@@ -76,7 +76,15 @@ export async function refreshLibrary(): Promise<void> {
 }
 
 export function openSettings(): void {
-  set({ settingsOpen: true })
+  set({ settingsOpen: true, propertiesId: null })
+}
+
+export function openProperties(id: string): void {
+  set({ propertiesId: id, settingsOpen: false })
+}
+
+export function closeProperties(): void {
+  set({ propertiesId: null })
 }
 
 export function closeSettings(): void {

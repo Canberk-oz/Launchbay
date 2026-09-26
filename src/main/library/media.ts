@@ -172,6 +172,12 @@ export class MediaService extends EventEmitter {
     return record?.status === 'ok' ? (record.frame ?? 'art') : 'art'
   }
 
+  /** The URL or file the cached cover came from. */
+  coverSource(id: string): string | null {
+    const record = this.state.covers[id]
+    return record?.status === 'ok' ? record.source : null
+  }
+
   coverBackground(id: string): string | null {
     const record = this.state.covers[id]
     return record?.status === 'ok' ? (record.background ?? null) : null

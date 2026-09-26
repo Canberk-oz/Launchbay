@@ -10,6 +10,7 @@ export const IPC = {
   launchGame: 'game:launch',
   getTrailer: 'game:get-trailer',
   showContextMenu: 'game:show-context-menu',
+  getGameDetails: 'game:get-details',
   updateSettings: 'settings:update',
   setHotkey: 'hotkey:set',
   suspendHotkey: 'hotkey:suspend',

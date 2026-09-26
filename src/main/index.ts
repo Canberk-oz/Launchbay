@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   await library.init()
 
   const launcher = new LaunchService(library)
-  const actions = new GameActions(library, launcher)
+  const actions = new GameActions(library, launcher, media)
   const windows = new WindowManager(root, {
     closeToTray: () => settings.get().closeToTray,
     isQuitting: () => quitting,

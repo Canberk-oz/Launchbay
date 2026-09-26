@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { TILE_SIZE_MAX, TILE_SIZE_MIN } from '@shared/types'
 import {
   closeSettings,
+  openProperties,
   focusSearch,
   launchGame,
   openSettings,
@@ -17,6 +18,7 @@ import { Toolbar } from './components/Toolbar'
 import { LibraryView } from './components/LibraryView'
 import { LaunchOverlay } from './components/LaunchOverlay'
 import { SettingsPanel } from './components/SettingsPanel'
+import { PropertiesPanel } from './components/PropertiesPanel'
 import { Toasts } from './components/Toasts'
 
 const api = window.launchbay
@@ -29,7 +31,7 @@ function useMainProcessEvents(setAnim: (a: 'in' | 'out' | null) => void): void {
       api.onHotkeyStatus((hotkey) => useStore.setState({ hotkey })),
       api.onOpenSettings(() => openSettings()),
       api.onContextAction(({ action, id }) => {
-        if (action !== 'launch') return
+        if (action === 'properties') return openProperties(id)
         const game = useStore.getState().games.find((g) => g.id === id)
         if (game) void launchGame(game, document.querySelector(`[data-game-id="${CSS.escape(id)}"] .cover-host`))
       }),
@@ -77,7 +79,7 @@ function useGlobalKeys(): void {
         if (state.settings.viewMode !== 'grid') return
         const step = e.key === '-' ? -24 : 24
         updateSettings({ tileSize: Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, state.settings.tileSize + step)) })
-      } else if (e.key === 'Escape' && !e.defaultPrevented && !state.settingsOpen) {
+      } else if (e.key === 'Escape' && !e.defaultPrevented && !state.settingsOpen && !state.propertiesId) {
         if (state.search) useStore.setState({ search: '' })
         else if (state.overlay) void api.hideWindow()
       }
@@ -126,6 +128,7 @@ export function App(): React.JSX.Element {
       <LibraryView />
       <LaunchOverlay />
       <SettingsPanel />
+      <PropertiesPanel />
       <Toasts />
     </div>
   )

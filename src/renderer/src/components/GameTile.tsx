@@ -1,6 +1,6 @@
 import { memo, useRef } from 'react'
 import { PLATFORM_LABELS, type Game } from '@shared/types'
-import { focusSearch, launchGame, toggleFavorite } from '../actions'
+import { focusSearch, launchGame, openProperties, toggleFavorite } from '../actions'
 import { formatPlaytime } from '../lib/format'
 import { arrowDirection, moveFocus } from '../lib/focus'
 import { useTrailerPreview } from '../hooks/useTrailerPreview'
@@ -27,7 +27,10 @@ export function handleGameKeys(e: React.KeyboardEvent<HTMLElement>, game: Game, 
     if (!moveFocus(e.currentTarget, dir) && dir === 'up') focusSearch()
     return
   }
-  if (e.key === 'Enter' || e.key === ' ') {
+  if (e.key === 'Enter' && e.altKey) {
+    e.preventDefault()
+    openProperties(game.id) // Alt+Enter: Properties, as in Explorer
+  } else if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     launch()
   } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.altKey && !e.metaKey) {

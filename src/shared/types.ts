@@ -151,7 +151,14 @@ export interface InitialState {
 /** `overlay`: summoned by the global hotkey; `show`: opened normally (tray, second launch). */
 export type WindowVisibility = 'show' | 'overlay' | 'hide'
 
-export type ContextAction = 'launch'
+/** Right-click menu picks the renderer carries out (they start UI there). */
+export type ContextAction = 'launch' | 'properties'
+
+/** Extra facts shown in a game's properties, fetched when the panel opens. */
+export interface GameDetails {
+  /** Where the cached cover came from: a URL or a local file path. */
+  coverSource: string | null
+}
 
 export interface MediaCacheInfo {
   coverBytes: number

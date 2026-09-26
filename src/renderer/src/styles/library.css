@@ -776,6 +776,28 @@
   color: var(--ink-2);
 }
 
+/* A long value (a path, a command): stacked under its label, wrapping, selectable. */
+.spec-table__row--long {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  height: auto;
+  min-height: 36px;
+  padding: 9px 0;
+}
+
+.spec-table__row--long dd {
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.is-selectable {
+  user-select: text;
+  cursor: text;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tile,
   .tile:hover,

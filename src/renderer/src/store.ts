@@ -52,6 +52,8 @@ export interface AppState {
   search: string
   platform: PlatformFilter
   settingsOpen: boolean
+  /** The game whose properties sheet is open. */
+  propertiesId: string | null
   launch: LaunchState | null
   toasts: Toast[]
   /** Transient "couldn't launch" marks on tiles, by game id. */
@@ -75,6 +77,7 @@ export const useStore = create<AppState>(() => ({
   search: '',
   platform: 'all',
   settingsOpen: false,
+  propertiesId: null,
   launch: null,
   toasts: [],
   tileErrors: {},

@@ -140,6 +140,11 @@ export class LibraryService extends EventEmitter {
     return [...this.games.values()].map((g) => this.toGame(g))
   }
 
+  /** The scan record behind a game (provider fields the renderer never sees). */
+  stored(id: string): StoredGame | undefined {
+    return this.games.get(id)
+  }
+
   get(id: string): Game | undefined {
     const stored = this.games.get(id)
     return stored ? this.toGame(stored) : undefined

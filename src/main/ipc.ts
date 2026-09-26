@@ -48,6 +48,8 @@ export function registerIpc(deps: IpcDeps): void {
     return game ? media.getTrailerSource(game) : null
   })
 
+  ipcMain.handle(IPC.getGameDetails, (_e, id: unknown) => actions.details(asString(id)))
+
   ipcMain.handle(IPC.showContextMenu, (event: IpcMainInvokeEvent, id: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return

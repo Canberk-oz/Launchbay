@@ -1,7 +1,9 @@
 import { Menu, shell, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
-import type { Game, LaunchResult } from '@shared/types'
+import type { Game, GameDetails, LaunchResult } from '@shared/types'
 import type { LaunchService } from './launch'
 import type { LibraryService } from './library/library'
+import type { MediaService } from './library/media'
+import { providerFor } from './providers'
 import { createLogger } from './util/log'
 
 const log = createLogger('actions')
@@ -17,10 +19,23 @@ export type MenuEntry = { label: string; run: (game: Game) => void } | 'separato
 export class GameActions {
   private readonly library: LibraryService
   private readonly launcher: LaunchService
+  private readonly media: MediaService
 
-  constructor(library: LibraryService, launcher: LaunchService) {
+  constructor(library: LibraryService, launcher: LaunchService, media: MediaService) {
     this.library = library
     this.launcher = launcher
+    this.media = media
+  }
+
+  /** The game's store page, or null when its provider can't build one for it. */
+  storePageUrl(id: string): string | null {
+    const stored = this.library.stored(id)
+    return stored ? (providerFor(stored.platform).storePageUrl?.(stored) ?? null) : null
+  }
+
+  details(id: string): GameDetails | null {
+    if (!this.library.get(id)) return null
+    return { coverSource: this.media.coverSource(id) }
   }
 
   launch(id: string): Promise<LaunchResult> {
