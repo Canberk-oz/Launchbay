@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PLATFORM_LABELS, PLATFORMS, type MediaCacheInfo, type Settings } from '@shared/types'
-import { closeSettings, refreshLibrary, unhideGame, updateSettings } from '../actions'
+import { closeSettings, exportLibrary, refreshLibrary, unhideGame, updateSettings } from '../actions'
 import { formatBytes, formatRelative, plural } from '../lib/format'
 import { useStore } from '../store'
 import { HotkeyRecorder } from './HotkeyRecorder'
@@ -113,6 +113,17 @@ function SettingsBody(): React.JSX.Element {
             <RefreshIcon size={15} className={scan.scanning ? 'is-spinning' : undefined} />
             {scan.scanning ? 'Scanning…' : 'Refresh library'}
           </button>
+        </div>
+        <div className="spec-block__foot">
+          <span className="muted">Export every game, hidden ones included.</span>
+          <span className="spec-block__actions">
+            <button className="btn" onClick={() => void exportLibrary('csv')}>
+              Export CSV
+            </button>
+            <button className="btn" onClick={() => void exportLibrary('json')}>
+              Export JSON
+            </button>
+          </span>
         </div>
         {hidden.length > 0 && (
           <div className="hidden-list">

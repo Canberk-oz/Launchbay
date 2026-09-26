@@ -1,12 +1,18 @@
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
-import type { InitialState, Settings } from '@shared/types'
+import type { ExportResult, InitialState, Settings } from '@shared/types'
 import type { GameActions } from './gameActions'
 import type { HotkeyManager } from './hotkey'
+import { libraryToCsv, libraryToJson } from './library/exportFormat'
 import type { LibraryService } from './library/library'
 import type { MediaService } from './library/media'
 import type { SettingsStore } from './settings'
+import { writeFileAtomic } from './util/fsutil'
+import { createLogger } from './util/log'
 import type { WindowManager } from './window'
+
+const log = createLogger('ipc')
 
 export interface IpcDeps {
   library: LibraryService
@@ -77,4 +83,26 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(IPC.getMediaCacheInfo, () => media.cacheInfo())
 
   ipcMain.handle(IPC.clearTrailerCache, () => media.clearTrailerCache())
+
+  ipcMain.handle(IPC.exportLibrary, async (event, format: unknown): Promise<ExportResult> => {
+    const kind = format === 'csv' ? 'csv' : 'json'
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const stamp = new Date().toISOString().slice(0, 10)
+    const options = {
+      title: 'Export library',
+      defaultPath: join(app.getPath('documents'), `Launchbay library ${stamp}.${kind}`),
+      filters: [kind === 'csv' ? { name: 'CSV spreadsheet', extensions: ['csv'] } : { name: 'JSON', extensions: ['json'] }]
+    }
+    const choice = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
+    if (choice.canceled || !choice.filePath) return { saved: false }
+    const games = library.list()
+    try {
+      const text = kind === 'csv' ? libraryToCsv(games) : libraryToJson(games, { version: app.getVersion(), exportedAt: Date.now() })
+      await writeFileAtomic(choice.filePath, text)
+    } catch (err) {
+      log.warn(`export to ${choice.filePath} failed`, err)
+      return { saved: false, error: err instanceof Error ? err.message : String(err) }
+    }
+    return { saved: true, path: choice.filePath, count: games.length }
+  })
 }

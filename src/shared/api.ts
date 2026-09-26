@@ -1,5 +1,6 @@
 import type {
   ContextAction,
+  ExportResult,
   GameDetails,
   HotkeyChangeResult,
   HotkeyStatus,
@@ -31,6 +32,7 @@ export interface LaunchbayApi {
   hideWindow(): Promise<void>
   getMediaCacheInfo(): Promise<MediaCacheInfo>
   clearTrailerCache(): Promise<void>
+  exportLibrary(format: 'json' | 'csv'): Promise<ExportResult>
 
   onLibraryPatch(cb: (patch: LibraryPatch) => void): Unsubscribe
   onScanStatus(cb: (status: ScanStatus) => void): Unsubscribe

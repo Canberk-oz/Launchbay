@@ -36,6 +36,7 @@ npm run dev          # run with hot reload
 - **Launch:** click a cover. It lifts off the shelf, fills the window and blurs while the store's launcher starts the game. The view returns to the grid once the game is detected, after about 9 seconds without a detection, or immediately with an error on the tile if the hand-off fails.
 - **Overlay:** **Ctrl+Shift+G** (configurable) shows Launchbay centered and on top of whatever you're doing, with the cursor already in search. Type, press **Enter** to play the top match, and press the hotkey or Esc to hide it again. Closing the window keeps Launchbay in the tray, so the hotkey still works.
 - **Right-click a game:** Play, Add/Remove favorite, Open install folder, Open store page, Copy launch command, Hide from library, Properties…. Open store page appears only when the page can be built: always for Steam and Xbox, and for Epic when the launcher's catalog cache has the game's product slug. Hidden games can be restored from Settings.
+- **Export:** Settings → Libraries exports every game (hidden ones included) as CSV or JSON: name, store, IDs, install folder, launch command, size, playtime, last played, date added, update status, favorite and hidden. Unknown values are left empty (CSV) or `null` (JSON).
 - **Properties (Alt+Enter):** a read-only sheet with the game's size, playtime, last played, date added, update status, install folder, launch command, IDs and cover source.
 
 | Key | Action |

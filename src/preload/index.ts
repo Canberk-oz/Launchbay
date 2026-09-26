@@ -25,6 +25,7 @@ const api: LaunchbayApi = {
   hideWindow: () => ipcRenderer.invoke(IPC.hideWindow),
   getMediaCacheInfo: () => ipcRenderer.invoke(IPC.getMediaCacheInfo),
   clearTrailerCache: () => ipcRenderer.invoke(IPC.clearTrailerCache),
+  exportLibrary: (format) => ipcRenderer.invoke(IPC.exportLibrary, format),
 
   onLibraryPatch: (cb) => subscribe(IPC.libraryPatch, cb),
   onScanStatus: (cb) => subscribe(IPC.scanStatus, cb),

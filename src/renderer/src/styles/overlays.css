@@ -300,6 +300,12 @@
   margin-top: 12px;
 }
 
+.spec-block__actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
 .muted {
   color: var(--ink-2);
   font-size: 12px;

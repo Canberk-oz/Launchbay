@@ -17,6 +17,7 @@ export const IPC = {
   hideWindow: 'window:hide',
   getMediaCacheInfo: 'media:get-cache-info',
   clearTrailerCache: 'media:clear-trailers',
+  exportLibrary: 'library:export',
 
   // events
   libraryPatch: 'library:patch',

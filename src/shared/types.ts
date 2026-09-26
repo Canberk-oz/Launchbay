@@ -167,6 +167,10 @@ export interface GameDetails {
   coverSource: string | null
 }
 
+export type ExportResult =
+  | { saved: true; path: string; count: number }
+  | { saved: false; error?: string } // cancelled, or `error` when writing failed
+
 export interface MediaCacheInfo {
   coverBytes: number
   trailerBytes: number

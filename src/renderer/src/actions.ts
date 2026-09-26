@@ -75,6 +75,15 @@ export async function refreshLibrary(): Promise<void> {
   }
 }
 
+export async function exportLibrary(format: 'json' | 'csv'): Promise<void> {
+  const result = await api.exportLibrary(format).catch((err: unknown) => ({ saved: false as const, error: String(err) }))
+  if (result.saved) {
+    pushToast({ tone: 'info', title: `Exported ${result.count === 1 ? '1 game' : `${result.count} games`}`, message: result.path }, 4200)
+  } else if (result.error) {
+    pushToast({ tone: 'error', title: 'Export failed', message: result.error }, 8000)
+  }
+}
+
 export function openSettings(): void {
   set({ settingsOpen: true, propertiesId: null })
 }
