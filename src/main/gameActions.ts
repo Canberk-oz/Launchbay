@@ -147,7 +147,9 @@ const icons = new Map<string, NativeImage>()
 /**
  * A menu icon (resources/menu, drawn by scripts/generate-menu-icons.cjs) in
  * the ink that reads on the menu Windows is about to draw: light icons on a
- * dark menu, dark icons on a light one. The @2x file is picked up for high-DPI.
+ * dark menu, dark icons on a light one. The app forces the dark theme, so this
+ * is normally the light ink; the check stays so icons remain legible if Windows
+ * ever draws a menu light anyway. The @2x file is picked up for high-DPI.
  */
 function menuIcon(name: MenuIcon): NativeImage | undefined {
   const variant = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'

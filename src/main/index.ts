@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu, protocol } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, protocol } from 'electron'
 import { join } from 'node:path'
 import { acceleratorKeys } from '@shared/accelerator'
 import { IPC } from '@shared/ipc'
@@ -64,6 +64,8 @@ async function main(): Promise<void> {
   await app.whenReady()
   // No menu bar, and none of its default accelerators (Ctrl+R reload, Ctrl+W close, zoom).
   Menu.setApplicationMenu(null)
+  // The app is always dark, so native menus and dialogs are too, whatever the OS setting.
+  nativeTheme.themeSource = 'dark'
   const root = app.getPath('userData')
   initLogFile(join(root, 'launchbay.log'))
   log.info(`Launchbay ${app.getVersion()} starting (Electron ${process.versions.electron})`)
