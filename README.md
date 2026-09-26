@@ -29,7 +29,7 @@ npm run dev          # run with hot reload
 
 ## Using it
 
-- **Browse:** covers stand face-out in a grid (100–320 px, set with the slider) or in a dense list. Filter by All, Steam, Epic or Xbox, and sort by name, recently played or size.
+- **Browse:** covers stand face-out in a grid (100–320 px, set with the slider) or in a dense list. Filter by All, Steam, Epic or Xbox, and sort by name, recently played, size or recently added. "Added" is when a game arrived on this PC: its install folder's creation date, or when Launchbay first found it.
 - **Favorites:** hover a cover and click its star. Favorites are pinned in their own section above the full library, and they respect the platform filter.
 - **Trailer preview (Steam):** keep the pointer on a cover. A yellow hairline fills for 800 ms, then a muted, looping trailer crossfades in.
 - **Launch:** click a cover. It lifts off the shelf, fills the window and blurs while the store's launcher starts the game. The view returns to the grid once the game is detected, after about 9 seconds without a detection, or immediately with an error on the tile if the hand-off fails.

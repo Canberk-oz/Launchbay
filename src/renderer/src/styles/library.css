@@ -477,7 +477,7 @@
 /* ------------------------------------------------------------- list table */
 
 .library-scroll--list {
-  --cols: 36px minmax(160px, 1fr) 120px 92px 96px 124px 32px;
+  --cols: 36px minmax(160px, 1fr) 120px 92px 96px 124px 104px 32px;
 }
 
 .list-head,
@@ -648,12 +648,24 @@
   color: var(--accent);
 }
 
+/* Narrower: one date column fits. It is Added while sorting by it, else Last played. */
+@media (max-width: 1180px) {
+  .library-scroll--list {
+    --cols: 36px minmax(150px, 1fr) 112px 88px 92px 116px 32px;
+  }
+  .library-scroll--list:not(.is-sorted-by-added) :is(.list-head > :nth-child(7), .row__added),
+  .library-scroll--list.is-sorted-by-added :is(.list-head > :nth-child(6), .row__when) {
+    display: none;
+  }
+}
+
 @media (max-width: 980px) {
   .library-scroll--list {
     --cols: 36px minmax(140px, 1fr) 104px 84px 88px 32px;
   }
-  .list-head > :nth-child(6),
-  .row__when {
+  .list-head > :is(:nth-child(6), :nth-child(7)),
+  .row__when,
+  .row__added {
     display: none;
   }
 }

@@ -11,7 +11,7 @@ import {
 import { JsonStore } from './util/fsutil'
 
 const VIEW_MODES: ViewMode[] = ['grid', 'list']
-const SORT_MODES: SortMode[] = ['name', 'recent', 'size']
+const SORT_MODES: SortMode[] = ['name', 'recent', 'size', 'added']
 
 /** Merges untrusted input (the settings file, or a renderer patch) over a base, dropping invalid fields. */
 export function sanitizeSettings(input: unknown, base: Settings): Settings {

@@ -33,6 +33,11 @@ export function formatRelative(epochMs: number | null, now = Date.now()): string
   return relative.format(Math.round(seconds / (86400 * 365)), 'year')
 }
 
+/** A date as relative time, or a dash when unknown (unlike formatRelative's "Never"). */
+export function formatWhen(epochMs: number | null, now = Date.now()): string {
+  return epochMs ? formatRelative(epochMs, now) : '—'
+}
+
 export function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`
 }

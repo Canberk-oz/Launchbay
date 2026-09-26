@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { PLATFORM_LABELS, type Game, type SortMode } from '@shared/types'
 import { launchGame, toggleFavorite, updateSettings } from '../actions'
-import { formatBytes, formatPlaytime, formatRelative } from '../lib/format'
+import { formatBytes, formatPlaytime, formatRelative, formatWhen } from '../lib/format'
 import type { Section } from '../lib/library'
 import { useStore } from '../store'
 import { Cover } from './Cover'
@@ -54,6 +54,9 @@ const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: str
       <div className="row__num row__when" role="cell">
         {formatRelative(game.lastPlayed)}
       </div>
+      <div className="row__num row__added" role="cell">
+        {formatWhen(game.addedAt)}
+      </div>
       <div role="cell" className="row__fav">
         <button
           className={`row__star${game.isFavorite ? ' is-on' : ''}`}
@@ -92,6 +95,7 @@ function HeaderCell({ label, sort, align }: { label: string; sort?: SortMode; al
 export function VirtualList({ sections, resetKey }: { sections: Section[]; resetKey: string }): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const tileErrors = useStore((s) => s.tileErrors)
+  const sortMode = useStore((s) => s.settings.sortMode)
   const rows = useMemo(() => {
     const out: Row[] = []
     for (const section of sections) {
@@ -114,7 +118,12 @@ export function VirtualList({ sections, resetKey }: { sections: Section[]; reset
   }, [resetKey])
 
   return (
-    <div className="library-scroll library-scroll--list" ref={scrollRef} role="table" aria-label="Games">
+    <div
+      className={`library-scroll library-scroll--list${sortMode === 'added' ? ' is-sorted-by-added' : ''}`}
+      ref={scrollRef}
+      role="table"
+      aria-label="Games"
+    >
       <div className="list-head" role="row">
         <div role="columnheader" aria-label="Cover" />
         <HeaderCell label="Name" sort="name" />
@@ -122,6 +131,7 @@ export function VirtualList({ sections, resetKey }: { sections: Section[]; reset
         <HeaderCell label="Playtime" align="end" />
         <HeaderCell label="Size" sort="size" align="end" />
         <HeaderCell label="Last played" sort="recent" align="end" />
+        <HeaderCell label="Added" sort="added" align="end" />
         <div role="columnheader" aria-label="Favorite" />
       </div>
       <div className="list-canvas" style={{ height: virtualizer.getTotalSize() + BOTTOM }}>

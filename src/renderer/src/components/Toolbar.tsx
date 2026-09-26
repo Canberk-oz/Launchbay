@@ -61,6 +61,7 @@ export function Toolbar(): React.JSX.Element {
               <option value="name">Name</option>
               <option value="recent">Recently played</option>
               <option value="size">Size on disk</option>
+              <option value="added">Recently added</option>
             </select>
             <ChevronDownIcon size={14} />
           </span>

@@ -45,6 +45,9 @@ export function compareGames(a: Game, b: Game, mode: SortMode): number {
   } else if (mode === 'size') {
     const d = (b.sizeOnDisk ?? -1) - (a.sizeOnDisk ?? -1)
     if (d !== 0) return d
+  } else if (mode === 'added') {
+    const d = (b.addedAt ?? 0) - (a.addedAt ?? 0)
+    if (d !== 0) return d
   }
   return collator.compare(a.name, b.name) || a.platform.localeCompare(b.platform)
 }

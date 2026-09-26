@@ -63,7 +63,7 @@ export interface Game {
 }
 
 export type ViewMode = 'grid' | 'list'
-export type SortMode = 'name' | 'recent' | 'size'
+export type SortMode = 'name' | 'recent' | 'size' | 'added'
 
 export const TILE_SIZE_MIN = 100
 export const TILE_SIZE_MAX = 320

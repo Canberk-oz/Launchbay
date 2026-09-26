@@ -110,3 +110,14 @@ test('addedAt: an install folder creation time when believable, otherwise now', 
   assert.equal(addedAtFrom(now + 60_000, now), now) // clock skew: never in the future
   assert.equal(addedAtFrom(Number.NaN, now), now)
 })
+
+test('sections: "Recently added" puts the newest arrivals first, undated games last', () => {
+  const games = [
+    game({ name: 'Old', addedAt: 100 }),
+    game({ name: 'Undated', addedAt: null }),
+    game({ name: 'New', addedAt: 300 }),
+    game({ name: 'Mid', addedAt: 200 })
+  ]
+  const [all] = buildSections(games, { search: '', platform: 'all', sort: 'added' })
+  assert.deepEqual(all.games.map((g) => g.name), ['New', 'Mid', 'Old', 'Undated'])
+})
