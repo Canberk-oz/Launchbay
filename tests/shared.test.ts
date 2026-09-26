@@ -124,3 +124,27 @@ test('sections: "Recently added" puts the newest arrivals first, undated games l
   const [all] = buildSections(games, { search: '', platform: 'all', sort: 'added' })
   assert.deepEqual(all.games.map((g) => g.name), ['New', 'Mid', 'Old', 'Undated'])
 })
+
+test('disk usage: totals by store and drive keep unknown and measuring counts beside the bytes', async () => {
+  const { diskUsage, driveOf } = await import('../src/renderer/src/lib/diskUsage')
+  assert.equal(driveOf('d:\\SteamLibrary\\steamapps\\common\\Portal 2'), 'D:')
+  assert.equal(driveOf('\\\\nas\\games\\Foo'), '\\\\nas\\games')
+  assert.equal(driveOf('/home/me/games'), '/')
+
+  const games = [
+    game({ name: 'Big', installPath: 'D:\\Steam\\Big', sizeOnDisk: 100, sizeStatus: 'known' }),
+    game({ name: 'Small', installPath: 'C:\\Steam\\Small', sizeOnDisk: 10, sizeStatus: 'known', isHidden: true }),
+    game({ name: 'Halo', platform: 'xbox', installPath: 'C:\\XboxGames\\Halo', sizeStatus: 'denied' }),
+    game({ name: 'Forza', platform: 'xbox', installPath: 'D:\\XboxGames\\Forza', sizeStatus: 'measuring' }),
+    game({ name: 'Alan', platform: 'epic', installPath: 'E:\\Epic\\Alan', sizeOnDisk: 50, sizeStatus: 'known' })
+  ]
+  const u = diskUsage(games)
+  assert.deepEqual(
+    { bytes: u.total.bytes, games: u.total.games, known: u.total.known, unknown: u.total.unknown, measuring: u.total.measuring },
+    { bytes: 160, games: 5, known: 3, unknown: 1, measuring: 1 } // the hidden game counts: it still takes space
+  )
+  assert.deepEqual(u.byPlatform.map((g) => [g.key, g.bytes, g.unknown, g.measuring]), [['steam', 110, 0, 0], ['epic', 50, 0, 0], ['xbox', 0, 1, 1]])
+  assert.deepEqual(u.byDrive.map((g) => [g.key, g.bytes, g.games]), [['D:', 100, 2], ['E:', 50, 1], ['C:', 10, 2]])
+  assert.deepEqual(u.largest.map((g) => g.name), ['Big', 'Alan', 'Small'])
+  assert.deepEqual(u.unknown.map((g) => g.name), ['Halo']) // measuring is not "unknown" yet
+})

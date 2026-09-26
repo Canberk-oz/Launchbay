@@ -54,6 +54,7 @@ export interface AppState {
   settingsOpen: boolean
   /** The game whose properties sheet is open. */
   propertiesId: string | null
+  diskUsageOpen: boolean
   launch: LaunchState | null
   toasts: Toast[]
   /** Transient "couldn't launch" marks on tiles, by game id. */
@@ -78,6 +79,7 @@ export const useStore = create<AppState>(() => ({
   platform: 'all',
   settingsOpen: false,
   propertiesId: null,
+  diskUsageOpen: false,
   launch: null,
   toasts: [],
   tileErrors: {},
@@ -105,4 +107,9 @@ export function applyPatch(patch: LibraryPatch): void {
   useStore.setState((s) =>
     patch.seq <= s.librarySeq ? {} : { games: applyLibraryPatch(s.games, patch), librarySeq: patch.seq }
   )
+}
+
+/** Whether any side sheet (settings, properties, disk usage) is open. */
+export function anySheetOpen(s: Pick<AppState, 'settingsOpen' | 'propertiesId' | 'diskUsageOpen'>): boolean {
+  return s.settingsOpen || s.propertiesId !== null || s.diskUsageOpen
 }

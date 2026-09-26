@@ -12,13 +12,14 @@ import {
   hotkeyLabel,
   updateSettings
 } from './actions'
-import { useStore } from './store'
+import { anySheetOpen, useStore } from './store'
 import { TitleBar } from './components/TitleBar'
 import { Toolbar } from './components/Toolbar'
 import { LibraryView } from './components/LibraryView'
 import { LaunchOverlay } from './components/LaunchOverlay'
 import { SettingsPanel } from './components/SettingsPanel'
 import { PropertiesPanel } from './components/PropertiesPanel'
+import { DiskUsagePanel } from './components/DiskUsagePanel'
 import { Toasts } from './components/Toasts'
 
 const api = window.launchbay
@@ -80,7 +81,7 @@ function useGlobalKeys(): void {
         if (state.settings.viewMode !== 'grid') return
         const step = e.key === '-' ? -24 : 24
         updateSettings({ tileSize: Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, state.settings.tileSize + step)) })
-      } else if (e.key === 'Escape' && !e.defaultPrevented && !state.settingsOpen && !state.propertiesId) {
+      } else if (e.key === 'Escape' && !e.defaultPrevented && !anySheetOpen(state)) {
         if (state.search) useStore.setState({ search: '' })
         else if (state.overlay) void api.hideWindow()
       }
@@ -130,6 +131,7 @@ export function App(): React.JSX.Element {
       <LaunchOverlay />
       <SettingsPanel />
       <PropertiesPanel />
+      <DiskUsagePanel />
       <Toasts />
     </div>
   )

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PLATFORM_LABELS, PLATFORMS, type MediaCacheInfo, type Settings } from '@shared/types'
-import { closeSettings, exportLibrary, refreshLibrary, unhideGame, updateSettings } from '../actions'
+import { closeSettings, exportLibrary, openDiskUsage, refreshLibrary, unhideGame, updateSettings } from '../actions'
 import { formatBytes, formatRelative, plural } from '../lib/format'
 import { useStore } from '../store'
 import { HotkeyRecorder } from './HotkeyRecorder'
@@ -112,6 +112,12 @@ function SettingsBody(): React.JSX.Element {
           <button className="btn" onClick={() => void refreshLibrary()} disabled={scan.scanning}>
             <RefreshIcon size={15} className={scan.scanning ? 'is-spinning' : undefined} />
             {scan.scanning ? 'Scanning…' : 'Refresh library'}
+          </button>
+        </div>
+        <div className="spec-block__foot">
+          <span className="muted">Where the disk space goes, by store and drive.</span>
+          <button className="btn" onClick={openDiskUsage}>
+            Disk usage
           </button>
         </div>
         <div className="spec-block__foot">

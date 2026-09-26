@@ -84,12 +84,23 @@ export async function exportLibrary(format: 'json' | 'csv'): Promise<void> {
   }
 }
 
+// One sheet at a time: opening one closes the others.
+const NO_SHEET = { settingsOpen: false, propertiesId: null, diskUsageOpen: false }
+
 export function openSettings(): void {
-  set({ settingsOpen: true, propertiesId: null })
+  set({ ...NO_SHEET, settingsOpen: true })
 }
 
 export function openProperties(id: string): void {
-  set({ propertiesId: id, settingsOpen: false })
+  set({ ...NO_SHEET, propertiesId: id })
+}
+
+export function openDiskUsage(): void {
+  set({ ...NO_SHEET, diskUsageOpen: true })
+}
+
+export function closeDiskUsage(): void {
+  set({ diskUsageOpen: false })
 }
 
 export function closeProperties(): void {
