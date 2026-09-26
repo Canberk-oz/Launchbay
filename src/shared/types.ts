@@ -26,6 +26,8 @@ export type TrailerState = 'unknown' | 'available' | 'none'
  */
 export type CoverFrame = 'art' | 'band' | 'mark'
 
+export type SizeStatus = 'known' | 'measuring' | 'denied' | 'failed' | 'unreported'
+
 export interface Game {
   /** Stable id: `${platform}:${platformId}`. */
   id: string
@@ -49,6 +51,13 @@ export interface Game {
   trailerUrl: string | null
   trailerState: TrailerState
   sizeOnDisk: number | null
+  /**
+   * Why `sizeOnDisk` is or isn't known. `measuring`: Launchbay is walking the
+   * install folder. `denied`: Windows refused access to part of it, so the
+   * size is unknown rather than a partial guess. `failed`: the walk failed.
+   * `unreported`: the store gives no size and there is nothing to measure.
+   */
+  sizeStatus: SizeStatus
   playtimeMinutes: number | null
   isFavorite: boolean
   /** Epoch ms. */

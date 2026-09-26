@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { PLATFORM_LABELS, type Game, type SortMode } from '@shared/types'
 import { launchGame, toggleFavorite, updateSettings } from '../actions'
-import { formatBytes, formatPlaytime, formatRelative, formatWhen } from '../lib/format'
+import { formatPlaytime, formatRelative, formatWhen, sizeText } from '../lib/format'
 import type { Section } from '../lib/library'
 import { useStore } from '../store'
 import { Cover } from './Cover'
@@ -53,8 +53,8 @@ const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: str
       <div className="row__num" role="cell">
         {formatPlaytime(game.playtimeMinutes)}
       </div>
-      <div className="row__num" role="cell">
-        {formatBytes(game.sizeOnDisk)}
+      <div className="row__num" role="cell" title={game.sizeStatus === 'known' ? undefined : sizeText(game, 'long')}>
+        {sizeText(game)}
       </div>
       <div className="row__num row__when" role="cell">
         {formatRelative(game.lastPlayed)}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PLATFORM_LABELS, type Game, type GameDetails } from '@shared/types'
 import { closeProperties } from '../actions'
-import { formatBytes, formatPlaytime, formatRelative } from '../lib/format'
+import { formatPlaytime, formatRelative, sizeText } from '../lib/format'
 import { useStore } from '../store'
 import { Cover } from './Cover'
 import { PlatformMark } from './Icons'
@@ -81,7 +81,7 @@ function PropertiesBody({ game }: { game: Game }): React.JSX.Element {
 
       <SheetBlock title="Game">
         <dl className="spec-table">
-          <Row label="Size on disk" value={game.sizeOnDisk ? formatBytes(game.sizeOnDisk) : notTracked(game)} muted={!game.sizeOnDisk} />
+          <Row label="Size on disk" value={sizeText(game, 'long')} muted={game.sizeStatus !== 'known'} long={game.sizeStatus === 'denied' || game.sizeStatus === 'failed'} />
           <Row label="Playtime" value={playtime} muted={!game.playtimeMinutes} />
           <Row label="Last played" value={lastPlayed.text} muted={lastPlayed.muted} />
           <Row label="Added" value={added.text} muted={added.muted} />

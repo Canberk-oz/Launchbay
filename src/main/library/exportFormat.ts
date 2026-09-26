@@ -13,6 +13,8 @@ export interface ExportedGame {
   installPath: string
   launchCommand: string
   sizeOnDiskBytes: number | null
+  /** Why a size is missing: measuring, denied (access), failed or unreported. */
+  sizeStatus: Game['sizeStatus']
   playtimeMinutes: number | null
   lastPlayed: string | null
   addedAt: string | null
@@ -35,6 +37,7 @@ export function toExported(games: Game[]): ExportedGame[] {
       installPath: g.installPath,
       launchCommand: g.launchCommand,
       sizeOnDiskBytes: g.sizeOnDisk,
+      sizeStatus: g.sizeStatus,
       playtimeMinutes: g.playtimeMinutes,
       lastPlayed: iso(g.lastPlayed),
       addedAt: iso(g.addedAt),
@@ -57,6 +60,7 @@ const CSV_COLUMNS: Array<keyof ExportedGame> = [
   'installPath',
   'launchCommand',
   'sizeOnDiskBytes',
+  'sizeStatus',
   'playtimeMinutes',
   'lastPlayed',
   'addedAt',

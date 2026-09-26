@@ -4,13 +4,14 @@
 import { EventEmitter } from 'node:events'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import type { Game, LibraryPatch, Platform, ScanStatus } from '@shared/types'
+import type { Game, LibraryPatch, Platform, ScanStatus, SizeStatus } from '@shared/types'
 import { providerFor, providers } from '../providers'
 import type { CoverSource, GameProvider, ScannedGame } from '../providers/types'
 import { JsonStore } from '../util/fsutil'
 import { createLogger } from '../util/log'
 import { addedAtFrom } from './addedAt'
 import type { MediaService } from './media'
+import { SizeService } from './sizes'
 
 const log = createLogger('library')
 
@@ -82,6 +83,7 @@ export class LibraryService extends EventEmitter {
   private readonly user: JsonStore<UserData>
   private readonly media: MediaService
   private readonly providers: readonly GameProvider[]
+  private readonly sizes: SizeService
   private readonly games = new Map<string, StoredGame>()
   private scanning: Promise<void> | null = null
   private queued: { manual: boolean } | null = null
@@ -90,9 +92,13 @@ export class LibraryService extends EventEmitter {
   private readonly removed = new Set<string>()
   private seq = 0
 
-  constructor(root: string, media: MediaService, stores: readonly GameProvider[] = providers) {
+  constructor(root: string, media: MediaService, stores: readonly GameProvider[] = providers, sizes = new SizeService(root)) {
     super()
     this.providers = stores
+    this.sizes = sizes
+    sizes.on('changed', (id: string) => {
+      if (this.games.has(id)) this.touch(id)
+    })
     this.cache = new JsonStore<LibraryCache>(join(root, 'library.json'), normalizeCache(null))
     this.user = new JsonStore<UserData>(join(root, 'userdata.json'), normalizeUserData(null))
     this.media = media
@@ -128,12 +134,17 @@ export class LibraryService extends EventEmitter {
   }
 
   async init(): Promise<void> {
-    await Promise.all([this.cache.load(normalizeCache), this.user.load(normalizeUserData)])
+    await Promise.all([this.cache.load(normalizeCache), this.user.load(normalizeUserData), this.sizes.init()])
     for (const g of this.cache.data.games) this.games.set(g.id, g)
   }
 
   async flush(): Promise<void> {
-    await Promise.all([this.cache.flush(), this.user.flush()])
+    await Promise.all([this.cache.flush(), this.user.flush(), this.sizes.flush()])
+  }
+
+  /** Stops background work (app quitting). */
+  dispose(): void {
+    this.sizes.dispose()
   }
 
   list(): Game[] {
@@ -217,7 +228,10 @@ export class LibraryService extends EventEmitter {
     if (this.removed.size > 0) this.emit('changed')
 
     const all = [...this.games.values()]
-    void this.media.prune(new Set(this.games.keys())).catch((err) => log.warn('media prune failed', err))
+    const keep = new Set(this.games.keys())
+    void this.media.prune(keep).catch((err) => log.warn('media prune failed', err))
+    this.sizes.prune(keep)
+    this.sizes.sync(all, { retryFailed: manual })
     void this.media.syncCovers(all, { retryFailed: manual })
     this.media.queueTrailerLookups(
       all.map((g) => this.toGame(g)),
@@ -271,6 +285,19 @@ export class LibraryService extends EventEmitter {
     this.touch(id)
   }
 
+  private sizeOf(g: StoredGame): { sizeOnDisk: number | null; sizeStatus: SizeStatus } {
+    if (g.sizeOnDisk !== null && g.sizeOnDisk > 0) return { sizeOnDisk: g.sizeOnDisk, sizeStatus: 'known' }
+    const measured = this.sizes.lookup(g.id, g.sizeKey)
+    switch (measured.status) {
+      case 'ok':
+        return { sizeOnDisk: measured.bytes, sizeStatus: 'known' }
+      case 'none':
+        return { sizeOnDisk: null, sizeStatus: g.sizeKey ? 'measuring' : 'unreported' }
+      default:
+        return { sizeOnDisk: null, sizeStatus: measured.status }
+    }
+  }
+
   private toGame(g: StoredGame): Game {
     const user = this.user.data.games[g.id] ?? {}
     const lastPlayed = Math.max(g.lastPlayed ?? 0, user.lastPlayed ?? 0) || null
@@ -287,7 +314,7 @@ export class LibraryService extends EventEmitter {
       coverAmbient: this.media.coverAmbient(g.id),
       trailerUrl: this.media.trailerUrl(g.id),
       trailerState: providerFor(g.platform).resolveTrailer ? this.media.trailerState(g.id) : 'none',
-      sizeOnDisk: g.sizeOnDisk,
+      ...this.sizeOf(g),
       playtimeMinutes: g.playtimeMinutes,
       isFavorite: !!user.favorite,
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,

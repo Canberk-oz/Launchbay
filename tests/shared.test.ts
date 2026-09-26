@@ -42,6 +42,7 @@ function game(partial: Partial<Game>): Game {
     trailerUrl: null,
     trailerState: 'none',
     sizeOnDisk: null,
+    sizeStatus: 'unreported',
     playtimeMinutes: null,
     isFavorite: false,
     favoritedAt: null,

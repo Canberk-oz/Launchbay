@@ -113,5 +113,6 @@ scripts/         Icon generator, scanner diagnostics
 
 ## Known limitations
 
-- Playtime is available for Steam only. Epic and Xbox keep theirs in the cloud. Install size is not shown for Xbox games.
+- Playtime is available for Steam only. Epic and Xbox keep theirs in the cloud.
+- Xbox games report no install size, so Launchbay measures each install folder in the background, one game at a time, after startup. The result is cached per package version. If Windows denies access to any part of a folder (common under `WindowsApps`), the size is shown as unknown rather than as a partial total.
 - The Epic provider is covered by unit tests but was not run against a live Epic install on the development machine. GDK (PC Game Pass) detection is exercised by tests. Classic Store games (Forager, Solitaire) were verified live.

@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     () => media.flush(),
     () => windows.flush()
   )
-  disposers.push(() => launcher.dispose())
+  disposers.push(() => launcher.dispose(), () => library.dispose())
 
   const send = (channel: string, payload?: unknown): void => {
     const win = windows.win

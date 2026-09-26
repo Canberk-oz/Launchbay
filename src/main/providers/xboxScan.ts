@@ -381,6 +381,8 @@ async function inspectPackage(pkg: RawPackage): Promise<ScannedGame | null> {
     installPath: root,
     launchCommand: `shell:AppsFolder\\${pkg.PackageFamilyName}!${appId}`,
     sizeOnDisk: null,
+    // Store packages report no size; the full name carries the version, so an update re-measures.
+    sizeKey: pkg.PackageFullName || pkg.PackageFamilyName,
     playtimeMinutes: null,
     lastPlayed: null,
     updateAvailable: null,

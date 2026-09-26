@@ -23,6 +23,12 @@ export interface ScannedGame {
   installPath: string
   launchCommand: string
   sizeOnDisk: number | null
+  /**
+   * Set when the store reports no size: Launchbay then measures the install
+   * folder in the background and caches the result under this key, so a new
+   * key (Xbox: a new package version) means measuring again.
+   */
+  sizeKey?: string
   playtimeMinutes: number | null
   /** Epoch ms, as recorded by the platform itself. */
   lastPlayed: number | null

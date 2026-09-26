@@ -1,3 +1,5 @@
+import { PLATFORM_LABELS, type Game } from '@shared/types'
+
 const tabular = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 })
 
 export function formatBytes(bytes: number | null): string {
@@ -31,6 +33,22 @@ export function formatRelative(epochMs: number | null, now = Date.now()): string
   if (abs < 86400 * 30) return relative.format(Math.round(seconds / 86400), 'day')
   if (abs < 86400 * 365) return relative.format(Math.round(seconds / (86400 * 30)), 'month')
   return relative.format(Math.round(seconds / (86400 * 365)), 'year')
+}
+
+/** A game's size, or why it isn't known, in a few words. */
+export function sizeText(game: Pick<Game, 'sizeOnDisk' | 'sizeStatus' | 'platform'>, style: 'short' | 'long' = 'short'): string {
+  switch (game.sizeStatus) {
+    case 'known':
+      return formatBytes(game.sizeOnDisk)
+    case 'measuring':
+      return style === 'short' ? '…' : 'Measuring…'
+    case 'denied':
+      return style === 'short' ? 'Unknown' : 'Unknown: Windows denied access to part of the install folder'
+    case 'failed':
+      return style === 'short' ? 'Unknown' : 'Unknown: the install folder couldn’t be measured'
+    case 'unreported':
+      return style === 'short' ? '—' : `Not reported by ${PLATFORM_LABELS[game.platform]}`
+  }
 }
 
 /** A date as relative time, or a dash when unknown (unlike formatRelative's "Never"). */
