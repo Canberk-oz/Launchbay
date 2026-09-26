@@ -2,7 +2,7 @@
 // Never calls Epic's web API (it requires an authenticated session).
 
 import { promises as fs } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { isDirectory, stripBom } from '../util/fsutil'
 import { readRegistry } from '../util/registry'
 import type { CoverSource, ScannedGame } from './types'
@@ -46,7 +46,8 @@ export function manifestImageSources(m: EpicManifest): CoverSource[] {
     if (typeof value !== 'string' || !/image|icon|logo|boxart|cover|thumb/i.test(key)) continue
     if (/^https?:\/\//i.test(value)) sources.push({ kind: 'url', url: value })
     else if (/\.(png|jpe?g|webp)$/i.test(value) && m.InstallLocation) {
-      sources.push({ kind: 'file', path: isAbsolute(value) ? value : join(m.InstallLocation, value) })
+      // Manifest paths are Windows paths wherever this runs (tests, diagnostics).
+      sources.push({ kind: 'file', path: win32.isAbsolute(value) ? value : win32.join(m.InstallLocation, value) })
     }
   }
   return sources

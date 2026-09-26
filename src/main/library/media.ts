@@ -51,6 +51,8 @@ export interface CoverJob {
 }
 
 const TRAILER_CACHE_LIMIT_BYTES = 768 * 1024 * 1024
+// Unreferenced files younger than this may belong to a write still in flight.
+const STRAY_FILE_GRACE_MS = 10 * 60_000
 const PROGRESSIVE_MAX_BYTES = 80 * 1024 * 1024
 // Steam's store API allows roughly 200 requests per 5 minutes.
 const LOOKUP_SPACING_MS = 1600
@@ -473,6 +475,46 @@ export class MediaService extends EventEmitter {
       if (record.status === 'available') delete record.file
     }
     this.store.save()
+  }
+
+  /**
+   * Drops the cover and trailer of every game not in `keep` (uninstalled
+   * games), plus stray files no record points at. Games with a job in flight
+   * are left alone until the next pass.
+   */
+  async prune(keep: ReadonlySet<string>): Promise<void> {
+    const drop: string[] = []
+    for (let i = this.lookupQueue.length - 1; i >= 0; i--) {
+      if (!keep.has(this.lookupQueue[i].id)) this.lookupQueue.splice(i, 1)
+    }
+    for (const [id, record] of Object.entries(this.state.covers)) {
+      if (keep.has(id) || this.coverJobs.has(id)) continue
+      if (record.status === 'ok') drop.push(join(this.coversDir, record.file))
+      delete this.state.covers[id]
+    }
+    for (const [id, record] of Object.entries(this.state.trailers)) {
+      if (keep.has(id) || this.previews.has(id) || this.lookups.has(id)) continue
+      if (record.status === 'available' && record.file) drop.push(join(this.trailersDir, record.file))
+      delete this.state.trailers[id]
+    }
+
+    const referenced = new Set<string>()
+    for (const r of Object.values(this.state.covers)) if (r.status === 'ok') referenced.add(join(this.coversDir, r.file))
+    for (const r of Object.values(this.state.trailers)) if (r.status === 'available' && r.file) referenced.add(join(this.trailersDir, r.file))
+    const cutoff = Date.now() - STRAY_FILE_GRACE_MS
+    for (const dir of [this.coversDir, this.trailersDir]) {
+      for (const name of await fs.readdir(dir).catch(() => [] as string[])) {
+        const path = join(dir, name)
+        if (referenced.has(path) || drop.includes(path)) continue
+        const st = await fs.stat(path).catch(() => null)
+        if (st?.isFile() && st.mtimeMs < cutoff) drop.push(path)
+      }
+    }
+
+    if (drop.length === 0) return
+    await Promise.all(drop.map((path) => fs.rm(path, { force: true })))
+    this.store.save()
+    log.info(`pruned ${drop.length} cached media file(s) of games no longer installed`)
   }
 
   async cacheInfo(): Promise<MediaCacheInfo> {

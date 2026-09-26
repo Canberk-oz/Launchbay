@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import {
   DEFAULT_HOTKEY,
-  TILE_SIZE_DEFAULT,
+  DEFAULT_SETTINGS,
   type Game,
   type HotkeyStatus,
   type InitialState,
@@ -69,16 +69,7 @@ export const useStore = create<AppState>(() => ({
   isPackaged: false,
   games: [],
   librarySeq: 0,
-  settings: {
-    hotkey: DEFAULT_HOTKEY,
-    hotkeyEnabled: true,
-    closeToTray: true,
-    hideAfterLaunch: true,
-    launchAtLogin: false,
-    viewMode: 'grid',
-    tileSize: TILE_SIZE_DEFAULT,
-    sortMode: 'name'
-  },
+  settings: DEFAULT_SETTINGS,
   hotkey: { accelerator: DEFAULT_HOTKEY, enabled: true, registered: false, error: null },
   scan: { scanning: false, lastScanAt: null },
   search: '',

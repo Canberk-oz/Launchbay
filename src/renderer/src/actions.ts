@@ -89,7 +89,8 @@ export function focusSearch(): void {
 
 // ----------------------------------------------------------------- launch
 
-const EXPAND_MS = 520
+/** The cover's expansion into the launch scene (LaunchOverlay animates it). */
+export const LAUNCH_EXPAND_MS = 520
 const MIN_HOLD_MS = 1100
 const RESULT_HOLD_MS = 650
 const SAFETY_TIMEOUT_MS = 13_000
@@ -146,7 +147,7 @@ export async function launchGame(game: Game, originEl: Element | null): Promise<
   set({ launch: { token, game, origin: rectOf(originEl), phase: 'opening', status: 'starting' } })
   setTimeout(() => {
     if (get().launch?.phase === 'opening') patchLaunch(token, { phase: 'waiting' })
-  }, EXPAND_MS)
+  }, LAUNCH_EXPAND_MS)
 
   const result = await Promise.race([
     api
@@ -156,7 +157,7 @@ export async function launchGame(game: Game, originEl: Element | null): Promise<
   ])
 
   if (!result.ok) {
-    await sleep(Math.max(0, EXPAND_MS - (Date.now() - started)))
+    await sleep(Math.max(0, LAUNCH_EXPAND_MS - (Date.now() - started)))
     patchLaunch(token, { status: 'failed', phase: 'closing' })
     await sleep(LAUNCH_CLOSE_MS)
     patchLaunch(token, null)

@@ -83,6 +83,17 @@ export interface Settings {
   sortMode: SortMode
 }
 
+export const DEFAULT_SETTINGS: Settings = {
+  hotkey: DEFAULT_HOTKEY,
+  hotkeyEnabled: true,
+  closeToTray: true,
+  hideAfterLaunch: true,
+  launchAtLogin: false,
+  viewMode: 'grid',
+  tileSize: TILE_SIZE_DEFAULT,
+  sortMode: 'name'
+}
+
 export type HotkeyError = 'in-use' | 'invalid'
 
 export interface HotkeyStatus {

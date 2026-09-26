@@ -212,6 +212,7 @@ export class LibraryService extends EventEmitter {
     if (this.removed.size > 0) this.emit('changed')
 
     const all = [...this.games.values()]
+    void this.media.prune(new Set(this.games.keys())).catch((err) => log.warn('media prune failed', err))
     void this.media.syncCovers(all, { retryFailed: manual })
     this.media.queueTrailerLookups(
       all.map((g) => this.toGame(g)),

@@ -1,8 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import {
-  DEFAULT_HOTKEY,
-  TILE_SIZE_DEFAULT,
+  DEFAULT_SETTINGS,
   TILE_SIZE_MAX,
   TILE_SIZE_MIN,
   type Settings,
@@ -10,17 +9,6 @@ import {
   type ViewMode
 } from '@shared/types'
 import { JsonStore } from './util/fsutil'
-
-export const DEFAULT_SETTINGS: Settings = {
-  hotkey: DEFAULT_HOTKEY,
-  hotkeyEnabled: true,
-  closeToTray: true,
-  hideAfterLaunch: true,
-  launchAtLogin: false,
-  viewMode: 'grid',
-  tileSize: TILE_SIZE_DEFAULT,
-  sortMode: 'name'
-}
 
 const VIEW_MODES: ViewMode[] = ['grid', 'list']
 const SORT_MODES: SortMode[] = ['name', 'recent', 'size']
