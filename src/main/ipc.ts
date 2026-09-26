@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC } from '@shared/ipc'
 import type { InitialState, Settings } from '@shared/types'
+import type { GameActions } from './gameActions'
 import type { HotkeyManager } from './hotkey'
-import type { LaunchService } from './launch'
 import type { LibraryService } from './library/library'
 import type { MediaService } from './library/media'
 import type { SettingsStore } from './settings'
@@ -13,7 +13,7 @@ export interface IpcDeps {
   media: MediaService
   settings: SettingsStore
   hotkeys: HotkeyManager
-  launcher: LaunchService
+  actions: GameActions
   windows: WindowManager
   isPackaged: boolean
   startHidden: boolean
@@ -22,7 +22,7 @@ export interface IpcDeps {
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 export function registerIpc(deps: IpcDeps): void {
-  const { library, media, settings, hotkeys, launcher, windows } = deps
+  const { library, media, settings, hotkeys, actions, windows } = deps
 
   ipcMain.handle(IPC.getInitialState, (): InitialState => ({
     version: app.getVersion(),
@@ -37,15 +37,11 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(IPC.refreshLibrary, () => library.refresh({ manual: true }))
 
-  ipcMain.handle(IPC.setFavorite, (_e, id: unknown, value: unknown) => {
-    if (library.get(asString(id))) library.setFavorite(asString(id), value === true)
-  })
+  ipcMain.handle(IPC.setFavorite, (_e, id: unknown, value: unknown) => actions.setFavorite(asString(id), value === true))
 
-  ipcMain.handle(IPC.setHidden, (_e, id: unknown, value: unknown) => {
-    if (library.get(asString(id))) library.setHidden(asString(id), value === true)
-  })
+  ipcMain.handle(IPC.setHidden, (_e, id: unknown, value: unknown) => actions.setHidden(asString(id), value === true))
 
-  ipcMain.handle(IPC.launchGame, (_e, id: unknown) => launcher.launch(asString(id)))
+  ipcMain.handle(IPC.launchGame, (_e, id: unknown) => actions.launch(asString(id)))
 
   ipcMain.handle(IPC.getTrailer, async (_e, id: unknown) => {
     const game = library.get(asString(id))
@@ -53,19 +49,9 @@ export function registerIpc(deps: IpcDeps): void {
   })
 
   ipcMain.handle(IPC.showContextMenu, (event: IpcMainInvokeEvent, id: unknown) => {
-    const game = library.get(asString(id))
     const win = BrowserWindow.fromWebContents(event.sender)
-    if (!game || !win) return
-    Menu.buildFromTemplate([
-      { label: 'Play', click: () => event.sender.send(IPC.contextAction, { action: 'launch', id: game.id }) },
-      {
-        label: game.isFavorite ? 'Remove from favorites' : 'Add to favorites',
-        click: () => library.setFavorite(game.id, !game.isFavorite)
-      },
-      { type: 'separator' },
-      { label: 'Open install folder', click: () => void shell.openPath(game.installPath) },
-      { label: 'Hide from library', click: () => library.setHidden(game.id, true) }
-    ]).popup({ window: win })
+    if (!win) return
+    actions.showMenu(asString(id), win, (gameId) => event.sender.send(IPC.contextAction, { action: 'launch', id: gameId }))
   })
 
   ipcMain.handle(IPC.updateSettings, (_e, patch: unknown) => {

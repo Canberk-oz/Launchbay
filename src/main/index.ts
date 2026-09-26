@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { acceleratorKeys } from '@shared/accelerator'
 import { IPC } from '@shared/ipc'
 import type { Settings } from '@shared/types'
+import { GameActions } from './gameActions'
 import { HotkeyManager } from './hotkey'
 import { registerIpc } from './ipc'
 import { LaunchService } from './launch'
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
   await library.init()
 
   const launcher = new LaunchService(library)
+  const actions = new GameActions(library, launcher)
   const windows = new WindowManager(root, {
     closeToTray: () => settings.get().closeToTray,
     isQuitting: () => quitting,
@@ -99,7 +101,7 @@ async function main(): Promise<void> {
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
   }
 
-  registerIpc({ library, media, settings, hotkeys, launcher, windows, isPackaged: app.isPackaged, startHidden })
+  registerIpc({ library, media, settings, hotkeys, actions, windows, isPackaged: app.isPackaged, startHidden })
 
   library.on(
     'changed',
