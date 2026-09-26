@@ -1,7 +1,14 @@
 import type { Game, Platform } from '@shared/types'
 
-/** Where a cover image can come from, tried in order until one works. */
-export type CoverSource = { kind: 'url'; url: string } | { kind: 'file'; path: string }
+/**
+ * Where a cover image can come from, tried in order until one works. A run of
+ * consecutive files is weighed as a group (see `pickArtwork`): `tier` ranks the
+ * provider's asset kinds (lower first, default 0), and `background` is the
+ * color the asset was designed to sit on, when its package declares one.
+ */
+export type CoverSource =
+  | { kind: 'url'; url: string }
+  | { kind: 'file'; path: string; tier?: number; background?: string }
 
 /**
  * What a provider knows about an installed game. The library service turns it

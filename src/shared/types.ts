@@ -18,6 +18,14 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
  */
 export type TrailerState = 'unknown' | 'available' | 'none'
 
+/**
+ * How a cover fills its 2:3 tile. `art` is cropped to fill it edge to edge.
+ * `band` is art too wide to crop (a 16:9 splash, a Steam header): it spans the
+ * tile's width over a blurred copy of itself. `mark` is a logo or icon on a
+ * plain background: it sits centered on `coverBackground`.
+ */
+export type CoverFrame = 'art' | 'band' | 'mark'
+
 export interface Game {
   /** Stable id: `${platform}:${platformId}`. */
   id: string
@@ -29,8 +37,12 @@ export interface Game {
   launchCommand: string
   /** `glmedia://` URL of the locally cached cover, or null when none is available. */
   coverImageUrl: string | null
-  /** The cover is a transparent logo (Store packages) rather than full-bleed art. */
-  coverIsLogo: boolean
+  coverFrame: CoverFrame
+  /**
+   * CSS color behind a `mark`: the solid color the asset was drawn on, or the
+   * one its package declares. Null means a blurred, enlarged copy of the image.
+   */
+  coverBackground: string | null
   /** Direct trailer URL (a Steam DASH manifest or progressive video); Steam only. */
   trailerUrl: string | null
   trailerState: TrailerState

@@ -8,13 +8,14 @@ import { createHash } from 'node:crypto'
 import { createReadStream, promises as fs } from 'node:fs'
 import { extname, join } from 'node:path'
 import { Readable } from 'node:stream'
-import type { Game, MediaCacheInfo, TrailerState } from '@shared/types'
+import type { CoverFrame, Game, MediaCacheInfo, TrailerState } from '@shared/types'
 import type { CoverSource, GameProvider } from '../providers/types'
 import { directorySize, JsonStore, pathExists, writeFileAtomic } from '../util/fsutil'
 import { HttpError, httpGet, httpGetBuffer, httpGetText, isTransientError } from '../util/http'
 import { createLimiter, sleep } from '../util/concurrency'
 import { createLogger } from '../util/log'
 import { analyzeArtwork, type Artwork } from './artwork'
+import { pickArtwork } from './framing'
 import { planDashPreview, rebaseFragments } from './dash'
 
 const log = createLogger('media')
@@ -22,7 +23,15 @@ const log = createLogger('media')
 export const MEDIA_SCHEME = 'glmedia'
 
 type CoverRecord =
-  | { status: 'ok'; file: string; source: string; updatedAt: number; logo?: boolean }
+  | {
+      status: 'ok'
+      file: string
+      source: string
+      updatedAt: number
+      /** Missing on records from before framing existed; those are re-analyzed on the next sync. */
+      frame?: CoverFrame
+      background?: string
+    }
   | { status: 'failed'; error: string; updatedAt: number }
 
 type TrailerRecord =
@@ -132,9 +141,22 @@ export class MediaService extends EventEmitter {
       games.map(async (game) => {
         if (this.coverJobs.has(game.id)) return
         const record = this.state.covers[game.id]
-        if (record?.status === 'ok' && (await pathExists(join(this.coversDir, record.file)))) return
+        let work = (): Promise<void> => this.fetchCover(game)
+        if (record?.status === 'ok' && (await pathExists(join(this.coversDir, record.file)))) {
+          if (record.frame) return
+          // Cached before covers were framed. Downloaded art only needs its
+          // pixels re-read; local picks (package logos) are chosen again.
+          work = /^https?:/i.test(record.source)
+            ? () => this.reframeCover(game.id, record)
+            : async () => {
+                await this.fetchCover(game)
+                if (this.state.covers[game.id]?.status === 'ok') return
+                this.state.covers[game.id] = record // keep the old cover rather than none
+                await this.reframeCover(game.id, record)
+              }
+        }
         if (record?.status === 'failed' && !opts.retryFailed) return
-        const job = this.coverLimit(() => this.fetchCover(game))
+        const job = this.coverLimit(work)
           .catch((err) => log.warn(`cover job for ${game.id} crashed`, err))
           .finally(() => this.coverJobs.delete(game.id))
         this.coverJobs.set(game.id, job)
@@ -142,15 +164,25 @@ export class MediaService extends EventEmitter {
     )
   }
 
-  coverIsLogo(id: string): boolean {
+  coverFrame(id: string): CoverFrame {
     const record = this.state.covers[id]
-    return record?.status === 'ok' && record.logo === true
+    return record?.status === 'ok' ? (record.frame ?? 'art') : 'art'
+  }
+
+  coverBackground(id: string): string | null {
+    const record = this.state.covers[id]
+    return record?.status === 'ok' ? (record.background ?? null) : null
+  }
+
+  private async reframeCover(id: string, record: Extract<CoverRecord, { status: 'ok' }>): Promise<void> {
+    const art = analyzeArtwork(await fs.readFile(join(this.coversDir, record.file)))
+    if (art) await this.saveCover(id, art, record.source)
   }
 
   /**
    * Tries the sources in order. A run of consecutive local files (package
-   * logos, Steam's own cache) is compared as a group, and the image showing
-   * the most artwork wins.
+   * logos, Steam's own cache) is compared as a group and `pickArtwork` chooses
+   * one, by the provider's tiers and how much artwork each image shows.
    */
   private async fetchCover(game: CoverJob): Promise<void> {
     let lastError = 'no cover source'
@@ -169,23 +201,24 @@ export class MediaService extends EventEmitter {
           lastError = errorMessage(err)
         }
       } else {
-        const group: string[] = []
+        const found: Array<{ art: Artwork; path: string; tier: number; background?: string }> = []
         while (i < sources.length) {
           const next = sources[i]
           if (next.kind !== 'file') break
-          group.push(next.path)
           i++
-        }
-        for (const path of group) {
           try {
-            const candidate = analyzeArtwork(await fs.readFile(path))
-            if (candidate && (!art || candidate.content > art.content)) {
-              art = candidate
-              origin = path
-            }
+            const candidate = analyzeArtwork(await fs.readFile(next.path))
+            if (candidate) found.push({ art: candidate, path: next.path, tier: next.tier ?? 0, background: next.background })
           } catch (err) {
             lastError = errorMessage(err)
           }
+        }
+        const best = found[pickArtwork(found.map((f) => ({ tier: f.tier, frame: f.art.frame, content: f.art.content })))]
+        if (best) {
+          art = best.art
+          origin = best.path
+          // A transparent mark takes the color its package declares for it.
+          if (art.frame === 'mark' && !art.background && best.background) art = { ...art, background: best.background }
         }
       }
       if (art && art.data.length >= 256) {
@@ -204,7 +237,14 @@ export class MediaService extends EventEmitter {
     if (previous?.status === 'ok' && previous.file !== file) {
       await fs.rm(join(this.coversDir, previous.file), { force: true })
     }
-    this.state.covers[id] = { status: 'ok', file, source: origin, updatedAt: Date.now(), ...(art.logo ? { logo: true } : {}) }
+    this.state.covers[id] = {
+      status: 'ok',
+      file,
+      source: origin,
+      updatedAt: Date.now(),
+      frame: art.frame,
+      ...(art.background ? { background: art.background } : {})
+    }
     this.changed()
   }
 

@@ -32,10 +32,6 @@
   box-shadow: 0 30px 80px var(--shadow-ink);
 }
 
-.launch__cover .cover--wide .cover__img {
-  filter: none;
-}
-
 .launch__veil {
   position: absolute;
   inset: 0;
