@@ -45,6 +45,7 @@ function game(partial: Partial<Game>): Game {
     isFavorite: false,
     favoritedAt: null,
     lastPlayed: null,
+    addedAt: null,
     isHidden: false,
     ...partial
   }
@@ -97,4 +98,15 @@ test('library patches: upsert, add and remove by id, leaving untouched games as 
   assert.equal(next[1], b2)
   assert.equal(applyLibraryPatch(games, { upsert: [], remove: [] }), games)
   assert.deepEqual(applyLibraryPatch(games, { upsert: [], remove: ['nope'] }).length, 3)
+})
+
+test('addedAt: an install folder creation time when believable, otherwise now', async () => {
+  const { addedAtFrom } = await import('../src/main/library/addedAt')
+  const now = Date.UTC(2026, 8, 26)
+  const installed = Date.UTC(2024, 2, 1)
+  assert.equal(addedAtFrom(installed, now), installed)
+  assert.equal(addedAtFrom(null, now), now) // stat failed
+  assert.equal(addedAtFrom(0, now), now) // filesystem without creation times
+  assert.equal(addedAtFrom(now + 60_000, now), now) // clock skew: never in the future
+  assert.equal(addedAtFrom(Number.NaN, now), now)
 })

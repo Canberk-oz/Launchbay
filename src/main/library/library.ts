@@ -2,12 +2,14 @@
 // (favorites, hidden, last played) and the media cache into `Game` records.
 
 import { EventEmitter } from 'node:events'
+import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { Game, LibraryPatch, Platform, ScanStatus } from '@shared/types'
 import { providerFor, providers } from '../providers'
-import type { CoverSource, ScannedGame } from '../providers/types'
+import type { CoverSource, GameProvider, ScannedGame } from '../providers/types'
 import { JsonStore } from '../util/fsutil'
 import { createLogger } from '../util/log'
+import { addedAtFrom } from './addedAt'
 import type { MediaService } from './media'
 
 const log = createLogger('library')
@@ -30,6 +32,8 @@ interface UserGameState {
   favoritedAt?: number
   lastPlayed?: number
   hidden?: boolean
+  /** Epoch ms the game arrived on this PC; cleared when a successful scan no longer finds it. */
+  addedAt?: number
 }
 
 interface UserData {
@@ -77,6 +81,7 @@ export class LibraryService extends EventEmitter {
   private readonly cache: JsonStore<LibraryCache>
   private readonly user: JsonStore<UserData>
   private readonly media: MediaService
+  private readonly providers: readonly GameProvider[]
   private readonly games = new Map<string, StoredGame>()
   private scanning: Promise<void> | null = null
   private queued: { manual: boolean } | null = null
@@ -85,8 +90,9 @@ export class LibraryService extends EventEmitter {
   private readonly removed = new Set<string>()
   private seq = 0
 
-  constructor(root: string, media: MediaService) {
+  constructor(root: string, media: MediaService, stores: readonly GameProvider[] = providers) {
     super()
+    this.providers = stores
     this.cache = new JsonStore<LibraryCache>(join(root, 'library.json'), normalizeCache(null))
     this.user = new JsonStore<UserData>(join(root, 'userdata.json'), normalizeUserData(null))
     this.media = media
@@ -166,15 +172,16 @@ export class LibraryService extends EventEmitter {
   private async runScan(manual: boolean): Promise<void> {
     const started = Date.now()
     const results = await Promise.allSettled(
-      providers.map((p) => withTimeout(p.scan(), SCAN_TIMEOUT_MS, p.label))
+      this.providers.map((p) => withTimeout(p.scan(), SCAN_TIMEOUT_MS, p.label))
     )
     const now = Date.now()
+    const arrived: StoredGame[] = []
 
     results.forEach((result, index) => {
-      const platform: Platform = providers[index].platform
+      const platform: Platform = this.providers[index].platform
       if (result.status === 'rejected') {
         // Keep the last known games for this platform rather than dropping them.
-        log.error(`${providers[index].label} scan failed`, result.reason)
+        log.error(`${this.providers[index].label} scan failed`, result.reason)
         return
       }
       const previous = new Map([...this.games].filter(([, g]) => g.platform === platform))
@@ -183,15 +190,21 @@ export class LibraryService extends EventEmitter {
         const id = `${scanned.platform}:${scanned.platformId}`
         const before = previous.get(id)
         previous.delete(id)
-        this.games.set(id, { ...scanned, id, lastScanned: now })
+        const stored = { ...scanned, id, lastScanned: now }
+        this.games.set(id, stored)
+        if (this.user.data.games[id]?.addedAt === undefined) arrived.push(stored)
         if (!before || !sameScan(before, scanned)) this.touch(id)
       }
+      // This platform was read successfully, so these games really are gone.
       for (const id of previous.keys()) {
         this.dirty.delete(id)
         this.removed.add(id)
+        this.forgetAddedAt(id)
       }
-      log.info(`${providers[index].label}: ${result.value.length} game(s)`)
+      log.info(`${this.providers[index].label}: ${result.value.length} game(s)`)
     })
+
+    await this.recordArrivals(arrived, now)
 
     this.cache.data = { version: 1, lastScanAt: now, games: [...this.games.values()] }
     this.cache.save()
@@ -204,6 +217,27 @@ export class LibraryService extends EventEmitter {
       all.map((g) => this.toGame(g)),
       { retryFailed: manual }
     )
+  }
+
+  /** Dates newly found games by their install folder's creation time (or now). */
+  private async recordArrivals(games: StoredGame[], now: number): Promise<void> {
+    if (games.length === 0) return
+    await Promise.all(
+      games.map(async (g) => {
+        const created = await fs.stat(g.installPath).then((st) => st.birthtimeMs, () => null)
+        this.userState(g.id).addedAt = addedAtFrom(created, now)
+        this.touch(g.id)
+      })
+    )
+    this.user.save()
+  }
+
+  private forgetAddedAt(id: string): void {
+    const state = this.user.data.games[id]
+    if (state?.addedAt === undefined) return
+    delete state.addedAt
+    if (Object.keys(state).length === 0) delete this.user.data.games[id]
+    this.user.save()
   }
 
   private userState(id: string): UserGameState {
@@ -251,6 +285,7 @@ export class LibraryService extends EventEmitter {
       isFavorite: !!user.favorite,
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,
       lastPlayed,
+      addedAt: user.addedAt ?? null,
       isHidden: !!user.hidden
     }
   }

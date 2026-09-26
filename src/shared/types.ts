@@ -53,6 +53,12 @@ export interface Game {
   favoritedAt: number | null
   /** Epoch ms: the later of the platform's own record and launches from Launchbay. */
   lastPlayed: number | null
+  /**
+   * Epoch ms the game arrived on this PC: its install folder's creation time
+   * when Launchbay first saw it, otherwise that moment. Null until the first
+   * scan that finds it.
+   */
+  addedAt: number | null
   isHidden: boolean
 }
 
