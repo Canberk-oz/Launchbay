@@ -117,13 +117,6 @@ export const WarningIcon = (p: IconProps): React.JSX.Element => (
   </Stroke>
 )
 
-export const EyeIcon = (p: IconProps): React.JSX.Element => (
-  <Stroke {...p}>
-    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-    <circle cx="12" cy="12" r="2.8" />
-  </Stroke>
-)
-
 export const EnterIcon = (p: IconProps): React.JSX.Element => (
   <Stroke {...p}>
     <path d="M19 5v6.5a2 2 0 0 1-2 2H6" />

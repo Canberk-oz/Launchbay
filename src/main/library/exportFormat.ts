@@ -2,8 +2,6 @@
 
 import type { Game } from '@shared/types'
 
-export type ExportFormat = 'json' | 'csv'
-
 /** One exported game: stable field names, dates as ISO 8601, sizes in bytes. */
 export interface ExportedGame {
   name: string
