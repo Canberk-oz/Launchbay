@@ -9,16 +9,46 @@ const set = useStore.setState
 // ------------------------------------------------------------------ toasts
 
 let toastSeq = 0
+/** The exit animation's length; see .toast.is-leaving. */
+const TOAST_OUT_MS = 170
+// Auto-dismiss clocks, by toast id. Hovering or focusing a toast pauses its clock.
+const toastClocks = new Map<number, { timer: ReturnType<typeof setTimeout> | null; remainingMs: number; startedAt: number }>()
 
-export function pushToast(toast: Omit<Toast, 'id'>, ttlMs = 5200): number {
+export function pushToast(toast: Omit<Toast, 'id' | 'leaving'>, ttlMs = 5200): number {
   const id = ++toastSeq
   set((s) => ({ toasts: [...s.toasts.slice(-2), { ...toast, id }] }))
-  if (ttlMs > 0) setTimeout(() => dismissToast(id), ttlMs)
+  if (ttlMs > 0) {
+    toastClocks.set(id, { timer: null, remainingMs: ttlMs, startedAt: 0 })
+    resumeToast(id)
+  }
   return id
 }
 
+/** Stops a toast's countdown while the pointer or keyboard focus is on it. */
+export function pauseToast(id: number): void {
+  const clock = toastClocks.get(id)
+  if (!clock?.timer) return
+  clearTimeout(clock.timer)
+  clock.timer = null
+  // Always leave enough time to finish reading (or reach the button) after moving away.
+  clock.remainingMs = Math.max(1500, clock.remainingMs - (Date.now() - clock.startedAt))
+}
+
+export function resumeToast(id: number): void {
+  const clock = toastClocks.get(id)
+  if (!clock || clock.timer) return
+  clock.startedAt = Date.now()
+  clock.timer = setTimeout(() => dismissToast(id), clock.remainingMs)
+}
+
 export function dismissToast(id: number): void {
-  set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
+  const clock = toastClocks.get(id)
+  if (clock?.timer) clearTimeout(clock.timer)
+  toastClocks.delete(id)
+  const toast = get().toasts.find((t) => t.id === id)
+  if (!toast || toast.leaving) return
+  set((s) => ({ toasts: s.toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)) }))
+  setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), TOAST_OUT_MS)
 }
 
 // --------------------------------------------------------------- settings

@@ -17,6 +17,8 @@ export interface Toast {
   title: string
   message?: string
   action?: { label: string; run: () => void }
+  /** Set while the toast plays its exit; it is removed right after. */
+  leaving?: boolean
 }
 
 export interface Rect {

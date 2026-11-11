@@ -788,6 +788,18 @@
   }
 }
 
+.toast.is-leaving {
+  pointer-events: none;
+  animation: toast-out 170ms var(--ease-in) forwards;
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
 .toast__icon {
   display: grid;
   margin-top: 1px;
@@ -875,6 +887,12 @@
     animation-name: fade-in;
   }
   .app--out {
+    animation-name: fade-out;
+  }
+  .toast {
+    animation-name: fade-in;
+  }
+  .toast.is-leaving {
     animation-name: fade-out;
   }
   .launch__status {
