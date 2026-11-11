@@ -11,6 +11,7 @@ import { ProcessWatcher } from './processWatch'
 import { LibraryService } from './library/library'
 import { MEDIA_SCHEME, MediaService } from './library/media'
 import { providerFor } from './providers'
+import { recentGames, sameRecent, type RecentEntry } from './recent'
 import { SettingsStore } from './settings'
 import { createTray, type AppTray } from './tray'
 import { throttle } from './util/concurrency'
@@ -185,8 +186,25 @@ async function main(): Promise<void> {
       windows.showNormal()
       send(IPC.openSettings)
     },
-    quit: () => app.quit()
+    quit: () => app.quit(),
+    // Straight from the tray, without the window. A failed hand-off brings the window up to say so.
+    launch: (id) =>
+      void actions.launch(id).then((result) => {
+        if (result.ok) return
+        windows.showNormal()
+        send(IPC.notice, { tone: 'error', title: `Couldn’t launch ${library.get(id)?.name ?? 'the game'}`, message: result.error })
+      })
   })
+  // The tray menu leads with the games played last; kept current as the library changes.
+  let recent: RecentEntry[] = []
+  const syncRecent = (): void => {
+    const next = recentGames(library.list())
+    if (sameRecent(next, recent)) return
+    recent = next
+    tray?.setRecent(next)
+  }
+  library.on('changed', throttle(syncRecent, 2000))
+  syncRecent()
   const status = hotkeys.getStatus()
   tray.setHotkeyHint(status.registered ? acceleratorKeys(status.accelerator).join('+') : null)
 
