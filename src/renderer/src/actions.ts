@@ -124,6 +124,8 @@ export async function refreshLibrary(): Promise<void> {
       )
     }
   } catch {
+    // The scan never started (or its reply was lost), so no scan-status event will clear this.
+    set((s) => ({ scan: { ...s.scan, scanning: false } }))
     pushToast({ tone: 'error', title: 'Refresh failed', message: 'The library could not be rescanned. Try again.' })
   }
 }
