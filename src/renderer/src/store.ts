@@ -76,7 +76,7 @@ export const useStore = create<AppState>(() => ({
   librarySeq: 0,
   settings: DEFAULT_SETTINGS,
   hotkey: { accelerator: DEFAULT_HOTKEY, enabled: true, registered: false, error: null },
-  scan: { scanning: false, lastScanAt: null },
+  scan: { scanning: false, lastScanAt: null, failed: [] },
   search: '',
   filter: 'all',
   settingsOpen: false,

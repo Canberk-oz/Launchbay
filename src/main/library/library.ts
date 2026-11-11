@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { cleanCollections, collectionsOf } from '@shared/collections'
-import type { Game, LibraryPatch, Platform, ScanStatus, SizeStatus } from '@shared/types'
+import { PLATFORMS, type Game, type LibraryPatch, type Platform, type ScanStatus, type SizeStatus } from '@shared/types'
 import { providerFor, providers } from '../providers'
 import type { GameProvider, ScannedGame } from '../providers/types'
 import { JsonStore } from '../util/fsutil'
@@ -58,6 +58,8 @@ export class LibraryService extends EventEmitter {
   private readonly games = new Map<string, StoredGame>()
   private scanning: Promise<void> | null = null
   private queued: ScanRequest | null = null
+  /** Stores whose latest scan failed; their games are the last known ones. */
+  private readonly failed = new Set<Platform>()
   // Running games (from the process watcher) and when each one's session began.
   private running: ReadonlySet<string> = new Set()
   private readonly sessionStarts = new Map<string, number>()
@@ -177,7 +179,7 @@ export class LibraryService extends EventEmitter {
   }
 
   scanStatus(): ScanStatus {
-    return { scanning: this.scanning !== null, lastScanAt: this.cache.data.lastScanAt }
+    return { scanning: this.scanning !== null, lastScanAt: this.cache.data.lastScanAt, failed: PLATFORMS.filter((p) => this.failed.has(p)) }
   }
 
   /**
@@ -218,8 +220,10 @@ export class LibraryService extends EventEmitter {
       if (result.status === 'rejected') {
         // Keep the last known games for this platform rather than dropping them.
         log.error(`${scanned[index].label} scan failed`, result.reason)
+        this.failed.add(platform)
         return
       }
+      this.failed.delete(platform)
       const previous = new Map([...this.games].filter(([, g]) => g.platform === platform))
       for (const id of previous.keys()) this.games.delete(id)
       for (const scanned of result.value) {

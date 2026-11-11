@@ -143,7 +143,11 @@ export function LibraryView(): React.JSX.Element | null {
     return (
       <Empty
         title="No games found on this PC"
-        body="Launchbay lists games installed through Steam, the Epic Games Launcher and the Xbox app. Install a game in any of them, then refresh."
+        body={
+          scan.failed.length
+            ? 'Launchbay couldn’t read every store this time, so games may be missing. Refresh to try again; the reason is in launchbay.log.'
+            : 'Launchbay lists games installed through Steam, the Epic Games Launcher and the Xbox app. Install a game in any of them, then refresh.'
+        }
       >
         <dl className="spec-table">
           {PLATFORMS.map((p) => (
@@ -152,7 +156,9 @@ export function LibraryView(): React.JSX.Element | null {
                 <PlatformMark platform={p} size={13} />
                 {PLATFORM_LABELS[p]}
               </dt>
-              <dd>Nothing installed</dd>
+              <dd className={scan.failed.includes(p) ? 'is-warning' : undefined}>
+                {scan.failed.includes(p) ? 'Couldn’t be read' : 'Nothing installed'}
+              </dd>
             </div>
           ))}
         </dl>

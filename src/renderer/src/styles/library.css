@@ -833,6 +833,10 @@
   color: var(--ink-2);
 }
 
+.spec-table dd.is-warning {
+  color: var(--accent);
+}
+
 /* A long value (a path, a command): stacked under its label, wrapping, selectable. */
 .spec-table__row--long {
   flex-direction: column;

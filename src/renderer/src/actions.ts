@@ -1,5 +1,5 @@
 import { acceleratorKeys } from '@shared/accelerator'
-import type { Game, Settings } from '@shared/types'
+import { PLATFORM_LABELS, type Game, type Settings } from '@shared/types'
 import { useStore, type LaunchState, type Rect, type Toast } from './store'
 
 const api = window.launchbay
@@ -48,6 +48,11 @@ export function updateSettings(patch: Partial<Settings>, immediate = false): voi
 
 // ------------------------------------------------------------------ games
 
+/** "Steam", "Steam and Xbox", "Steam, Epic and Xbox". */
+function listOf(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
 export function toggleFavorite(game: Game): void {
   const favorite = !game.isFavorite
   set((s) => ({
@@ -73,9 +78,21 @@ export async function refreshLibrary(): Promise<void> {
   if (get().scan.scanning) return
   set((s) => ({ scan: { ...s.scan, scanning: true } }))
   try {
-    await api.refreshLibrary()
-    const count = get().games.filter((g) => !g.isHidden).length
-    pushToast({ tone: 'info', title: 'Library refreshed', message: `${count} ${count === 1 ? 'game' : 'games'} on this PC.` }, 3200)
+    const { games, failed } = await api.refreshLibrary()
+    const found = `${games} ${games === 1 ? 'game' : 'games'} on this PC`
+    if (failed.length === 0) {
+      pushToast({ tone: 'info', title: 'Library refreshed', message: `${found}.` }, 3200)
+    } else {
+      // A store that couldn't be read keeps its last known games; say so instead of "refreshed".
+      pushToast(
+        {
+          tone: 'warning',
+          title: `Couldn’t read ${listOf(failed.map((p) => PLATFORM_LABELS[p]))}`,
+          message: `Showing the games found there last time. ${found}. The reason is in launchbay.log.`
+        },
+        9000
+      )
+    }
   } catch {
     pushToast({ tone: 'error', title: 'Refresh failed', message: 'The library could not be rescanned. Try again.' })
   }

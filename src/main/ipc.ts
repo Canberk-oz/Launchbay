@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
-import type { ExportResult, InitialState, Settings } from '@shared/types'
+import type { ExportResult, InitialState, RefreshResult, Settings } from '@shared/types'
 import type { GameActions } from './gameActions'
 import type { HotkeyManager } from './hotkey'
 import { libraryToCsv, libraryToJson } from './library/exportFormat'
@@ -41,7 +41,10 @@ export function registerIpc(deps: IpcDeps): void {
     startHidden: deps.startHidden
   }))
 
-  ipcMain.handle(IPC.refreshLibrary, () => library.refresh({ manual: true }))
+  ipcMain.handle(IPC.refreshLibrary, async (): Promise<RefreshResult> => {
+    await library.refresh({ manual: true })
+    return { games: library.list().filter((g) => !g.isHidden).length, failed: library.scanStatus().failed }
+  })
 
   ipcMain.handle(IPC.setFavorite, (_e, id: unknown, value: unknown) => actions.setFavorite(asString(id), value === true))
 

@@ -119,7 +119,13 @@ function SettingsBody(): React.JSX.Element {
                 <PlatformMark platform={p} size={13} />
                 {PLATFORM_LABELS[p]}
               </dt>
-              <dd className={counts[p] ? undefined : 'is-muted'}>{counts[p] ? plural(counts[p], 'game') : 'Not found'}</dd>
+              {scan.failed.includes(p) ? (
+                <dd className="is-warning" title="The last scan couldn’t read this store. The reason is in launchbay.log.">
+                  Couldn’t be read{counts[p] ? ` · ${plural(counts[p], 'game')} from last time` : ''}
+                </dd>
+              ) : (
+                <dd className={counts[p] ? undefined : 'is-muted'}>{counts[p] ? plural(counts[p], 'game') : 'Not found'}</dd>
+              )}
             </div>
           ))}
         </dl>

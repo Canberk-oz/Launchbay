@@ -9,6 +9,7 @@ import type {
   LaunchResult,
   MediaCacheInfo,
   Notice,
+  RefreshResult,
   ScanStatus,
   Settings,
   WindowVisibility
@@ -19,7 +20,7 @@ export type Unsubscribe = () => void
 /** The bridge the preload script exposes to the renderer as `window.launchbay`. */
 export interface LaunchbayApi {
   getInitialState(): Promise<InitialState>
-  refreshLibrary(): Promise<void>
+  refreshLibrary(): Promise<RefreshResult>
   setFavorite(id: string, favorite: boolean): Promise<void>
   setHidden(id: string, hidden: boolean): Promise<void>
   setCollections(id: string, names: string[]): Promise<void>

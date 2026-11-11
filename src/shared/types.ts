@@ -140,6 +140,18 @@ export interface ScanStatus {
   scanning: boolean
   /** Epoch ms of the last completed scan. */
   lastScanAt: number | null
+  /**
+   * Stores the latest scan could not read (PowerShell or the registry failed,
+   * a data folder was unreadable). Their games are the ones found last time.
+   */
+  failed: Platform[]
+}
+
+/** What a manual refresh found, once its scan has finished. */
+export interface RefreshResult {
+  /** Games on the shelf afterwards (hidden ones excluded). */
+  games: number
+  failed: Platform[]
 }
 
 export type LaunchResult =
