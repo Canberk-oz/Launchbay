@@ -25,6 +25,8 @@ export interface ExportedGame {
   updateAvailable: boolean | null
   isFavorite: boolean
   isHidden: boolean
+  /** The user's collections the game is in. */
+  collections: string[]
 }
 
 const iso = (ms: number | null): string | null => (ms ? new Date(ms).toISOString() : null)
@@ -47,7 +49,8 @@ export function toExported(games: Game[]): ExportedGame[] {
       addedAt: iso(g.addedAt),
       updateAvailable: g.updateAvailable,
       isFavorite: g.isFavorite,
-      isHidden: g.isHidden
+      isHidden: g.isHidden,
+      collections: [...g.tags]
     }))
 }
 
@@ -71,15 +74,18 @@ const CSV_COLUMNS: Array<keyof ExportedGame> = [
   'addedAt',
   'updateAvailable',
   'isFavorite',
-  'isHidden'
+  'isHidden',
+  'collections'
 ]
 
 /**
  * One CSV cell (RFC 4180). Text that a spreadsheet would read as a formula
  * (starting with = + - @, tab or CR) is prefixed with an apostrophe.
  */
-export function csvCell(value: string | number | boolean | null): string {
+export function csvCell(value: string | number | boolean | null | readonly string[]): string {
   if (value === null) return ''
+  // A list (collections) shares one cell, separated by "; ".
+  if (typeof value === 'object') return csvCell(value.join('; '))
   if (typeof value !== 'string') return String(value)
   const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text

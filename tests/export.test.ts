@@ -10,7 +10,7 @@ const base: Game = {
   addedAt: Date.UTC(2024, 0, 2), tags: [], updateAvailable: false, isHidden: false
 }
 const xbox: Game = { ...base, id: 'xbox:Foo_8wek', platform: 'xbox', platformId: 'Foo_8wek', name: 'Forza "Horizon", 5', installPath: 'C:\\XboxGames\\Forza',
-  launchCommand: 'shell:AppsFolder\\Foo_8wek!App', sizeOnDisk: null, sizeStatus: 'denied', playtimeMinutes: null, trackedMinutes: 95, lastPlayed: null, addedAt: null, updateAvailable: null, isFavorite: false, isHidden: true }
+  launchCommand: 'shell:AppsFolder\\Foo_8wek!App', tags: ['Racing', 'Couch, co-op'], sizeOnDisk: null, sizeStatus: 'denied', playtimeMinutes: null, trackedMinutes: 95, lastPlayed: null, addedAt: null, updateAvailable: null, isFavorite: false, isHidden: true }
 
 test('export: CSV cells are quoted per RFC 4180 and never run as formulas', () => {
   assert.equal(csvCell('plain'), 'plain')
@@ -26,11 +26,11 @@ test('export: CSV cells are quoted per RFC 4180 and never run as formulas', () =
 
 test('export: CSV has a BOM, a header, CRLF rows sorted by name, and empty cells for unknowns', () => {
   const csv = libraryToCsv([xbox, base])
-  assert.ok(csv.startsWith('\ufeffname,platform,platformId,id,installPath,launchCommand,sizeOnDiskBytes,sizeStatus,playtimeMinutes,playtimeTrackedByLaunchbayMinutes,lastPlayed,addedAt,updateAvailable,isFavorite,isHidden\r\n'))
+  assert.ok(csv.startsWith('\ufeffname,platform,platformId,id,installPath,launchCommand,sizeOnDiskBytes,sizeStatus,playtimeMinutes,playtimeTrackedByLaunchbayMinutes,lastPlayed,addedAt,updateAvailable,isFavorite,isHidden,collections\r\n'))
   const lines = csv.slice(1).trimEnd().split('\r\n')
   assert.equal(lines.length, 3)
-  assert.equal(lines[1], 'Forza ""Horizon"", 5'.replace(/^/, '"') + '",xbox,Foo_8wek,xbox:Foo_8wek,C:\\XboxGames\\Forza,shell:AppsFolder\\Foo_8wek!App,,denied,,95,,,,false,true')
-  assert.equal(lines[2], 'Portal 2,steam,620,steam:620,D:\\Steam\\steamapps\\common\\Portal 2,steam://run/620,12000000000,known,754,,2026-09-01T00:00:00.000Z,2024-01-02T00:00:00.000Z,false,true,false')
+  assert.equal(lines[1], 'Forza ""Horizon"", 5'.replace(/^/, '"') + '",xbox,Foo_8wek,xbox:Foo_8wek,C:\\XboxGames\\Forza,shell:AppsFolder\\Foo_8wek!App,,denied,,95,,,,false,true,"Racing; Couch, co-op"')
+  assert.equal(lines[2], 'Portal 2,steam,620,steam:620,D:\\Steam\\steamapps\\common\\Portal 2,steam://run/620,12000000000,known,754,,2026-09-01T00:00:00.000Z,2024-01-02T00:00:00.000Z,false,true,false,')
 })
 
 test('export: JSON carries metadata and null (not false) for updates a store does not report', () => {
@@ -42,4 +42,7 @@ test('export: JSON carries metadata and null (not false) for updates a store doe
   assert.equal(doc.games[0].updateAvailable, null)
   assert.equal(doc.games[1].updateAvailable, false)
   assert.equal(doc.games[1].sizeOnDiskBytes, 12_000_000_000)
+  assert.deepEqual(doc.games[0].collections, ['Racing', 'Couch, co-op'])
+  assert.deepEqual(doc.games[1].collections, [])
+  assert.equal(csvCell(['=Backlog', 'RPG']), "'=Backlog; RPG") // a list is one guarded cell
 })
