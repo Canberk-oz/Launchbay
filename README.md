@@ -19,8 +19,9 @@ npm run dev          # run with hot reload
 | `npm run build` then `npm start` | Production bundle in `out/`, then run it |
 | `npm run dist` | Windows installer: `dist/Launchbay-Setup-<version>.exe` |
 | `npm run dist:dir` | Unpacked app only: `dist/win-unpacked/Launchbay.exe` |
-| `npm test` | Unit tests (parsers, heuristics, DASH planning, shortcut validation) |
+| `npm test` | Unit tests: store parsers and heuristics, cover framing, DASH planning, running-game matching, sessions, sizes, export, the on-disk formats |
 | `npm run typecheck` | Type-checks the main, preload and renderer code |
+| `npm run check` | Type-check, then tests: run it before pushing (CI runs the same, plus a build) |
 | `npm run scan:diagnose` | Runs the three platform scanners without Electron and prints what they find |
 | `npm run icons` | Regenerates the app and tray icons (they are drawn procedurally) |
 | `npm run icons:menu` | Regenerates the right-click menu icons in `resources/menu` from the app's stroke icon family |
@@ -51,6 +52,7 @@ npm run dev          # run with hot reload
 | Enter / Space | Launch the focused game |
 | F | Toggle favorite on the focused game |
 | Alt+Enter | Properties of the focused game |
+| Menu key / Shift+F10 | Right-click menu for the focused game |
 | Ctrl + / Ctrl − | Larger or smaller tiles |
 | F5 / Ctrl+R | Refresh the library |
 | Ctrl+, | Settings |
@@ -63,10 +65,13 @@ Every store is a **provider** in `src/main/providers/` that implements one inter
 ```ts
 interface GameProvider {
   platform: Platform
-  scan(): Promise<ScannedGame[]>           // [] when the store isn't installed, never throws
+  scan(): Promise<ScannedGame[]>           // [] only when the store isn't installed; throws when it can't be read
   launch(game: Game): Promise<void>        // throws when the hand-off fails
-  resolveTrailer?(game): Promise<TrailerInfo | null>   // optional capability
-  launchWatch?(game): LaunchWatch                      // optional: how to detect "running"
+  resolveTrailer?(game): Promise<TrailerInfo | null>   // optional capabilities:
+  launchWatch?(game): LaunchWatch                      //   how to detect "running"
+  storePageUrl?(game): string | null                   //   the game's store page
+  uninstallHandoff?(game): UninstallHandoff | null     //   how to hand an uninstall to the store
+  screenshots?(game): Promise<ScreenshotFile[]>        //   screenshots the store keeps locally
 }
 ```
 
@@ -76,7 +81,7 @@ To add GOG Galaxy, Battle.net or Ubisoft Connect, write one of these, register i
 - **Epic:** reads `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item` and skips DLC, engine and plugin entries and incomplete installs. Covers come first from image fields in the manifest, then from the launcher's **local** catalog cache (`Catalog\catcache.bin`, whose image URLs point at Epic's public CDN). Epic's authenticated web API is never called. Games launch with `com.epicgames.launcher://apps/<AppName>?action=launch&silent=true`.
 - **Xbox / Microsoft Store:** runs `Get-AppxPackage` (plus `Get-StartApps` for the names Windows displays), reads each `AppxManifest.xml` and any GDK `MicrosoftGame.config`, and picks out games heuristically. Known system, codec and platform packages are excluded, and a package must then show a game signal: a GDK config, an Xbox Live protocol, an `XboxGames` install folder, or game-engine files. The cover is chosen from the package's own assets in this order: splash screen, large square tile (or GDK `Square480x480Logo`), wide tile, and only then the small icons. It is the first one large enough to look sharp, and 16:9 splash art gives way to croppable square art. Every cover fills its tile: art is cropped to fit, and a logo or icon is centered on the color it was drawn on (its own flat background or the manifest's `BackgroundColor`), or on a blurred, enlarged copy of itself. Games launch through `explorer.exe shell:AppsFolder\<PackageFamilyName>!<AppId>`, using the app's real Application Id from the manifest.
 
-A missing store is skipped silently. A store that is installed but can't be read (the registry or PowerShell failed, its data folder was unreadable) keeps its last known games until a later scan succeeds. A failed cover or trailer lookup is remembered and retried only on **Refresh library**, while the automatic rescan at startup doesn't retry it.
+A missing store is skipped silently. A store that is installed but can't be read (the registry or PowerShell failed, its data folder was unreadable) keeps its last known games until a later scan succeeds. A manual refresh says which store couldn't be read, and Settings → Libraries marks it; the reason is in `launchbay.log`. A failed cover or trailer lookup is remembered and retried only on **Refresh library**, while the automatic rescan at startup doesn't retry it.
 
 ## Where the spec met reality
 
@@ -85,7 +90,7 @@ A missing store is skipped silently. A store that is installed but can't be read
 - **Xbox detection** needs positive game signals as well as the exclusion list. Otherwise every Store app (WhatsApp, Clipchamp, and so on) would show up as a game. If something is misdetected, right-click it and choose **Hide from library**.
 - **Running games** are detected by one long-lived PowerShell process. It polls WMI for running executables (plus Steam's `RunningAppID`) and matches them against each game's install folder. It runs only while Launchbay is visible (every 2 s), while a launch is being confirmed (every 1 s), or while a game it saw start is still running (every 5 s, so it can see the game exit with Launchbay hidden). Otherwise nothing polls. Running games get a "Running" sticker.
 - **Slow starts:** the launch screen waits about 9 s. After that the game is still watched for in the background for 3 minutes, so a slow Game Pass start still gets its Running sticker, and "Hide Launchbay once a game is running" still applies.
-- **Playtime tracked by Launchbay:** Epic and Xbox keep playtime in the cloud, so Launchbay adds up the sessions its watcher saw (30 s or longer). This figure is always labeled "tracked by Launchbay". Games started while Launchbay was closed, or hidden with nothing running, aren't seen. Steam's own playtime is shown as Steam reports it.
+- **Playtime tracked by Launchbay:** Epic and Xbox keep playtime in the cloud, so Launchbay adds up the sessions its watcher saw (30 s or longer). This figure is always labeled "tracked by Launchbay". Games started while Launchbay was closed, or hidden with nothing running, aren't seen. Time the PC spends asleep isn't counted. Steam's own playtime is shown as Steam reports it.
 - **Hide Launchbay once a game is running** is on by default, so the overlay gets out of the way. You can turn it off in Settings.
 
 ## Data and privacy
@@ -93,10 +98,13 @@ A missing store is skipped silently. A store that is installed but can't be read
 Everything stays on this PC, under `%APPDATA%\Launchbay`:
 
 - `library.json`: the cached scan results
-- `userdata.json`: favorites, hidden games, and last played from Launchbay
+- `userdata.json`: favorites, hidden games, collections, date added, last played from Launchbay and the playtime it tracked
+- `sizes.json`: install sizes Launchbay measured (Xbox games)
 - `settings.json`, `window.json`
 - `media/`: cached covers and trailer previews
-- `launchbay.log`
+- `launchbay.log`, and `launchbay.log.old` once the log has passed 1 MB
+
+Files are written to a temporary name and renamed into place. If one of them can't be read at startup (cut off by a crash, edited by hand), Launchbay starts from defaults for that file and keeps the unreadable one next to it as `<name>.damaged-<time>.json` instead of overwriting it.
 
 Network requests go to the Steam CDN and store API (covers and trailer lookups) and to Epic's public image CDN. There are no accounts and no telemetry.
 
@@ -112,12 +120,13 @@ src/main/        Electron main process: providers, library + media cache, launch
 src/preload/     The typed window.launchbay bridge (context isolation, sandboxed)
 src/renderer/    React UI (Back of the Box design system: see DESIGN.md)
 src/shared/      Types, IPC channel names, shortcut helpers shared by both sides
-tests/           node:test unit tests (run TypeScript directly)
+tests/           node:test unit tests (run TypeScript directly; no Electron needed)
 scripts/         Icon generator, scanner diagnostics
 ```
 
 ## Known limitations
 
-- Playtime is available for Steam only. Epic and Xbox keep theirs in the cloud.
+- Steam's playtime is the only store figure. Epic and Xbox keep theirs in the cloud, so their playtime is only what Launchbay tracked itself.
+- The UI was built and tested on Linux under Electron with stand-in stores; process polling, store hand-offs and tray behaviour are Windows-only and are checked by hand.
 - Xbox games report no install size, so Launchbay measures each install folder in the background, one game at a time, after startup. The result is cached per package version. If Windows denies access to any part of a folder (common under `WindowsApps`), the size is shown as unknown rather than as a partial total.
 - The Epic provider is covered by unit tests but was not run against a live Epic install on the development machine. GDK (PC Game Pass) detection is exercised by tests. Classic Store games (Forager, Solitaire) were verified live.

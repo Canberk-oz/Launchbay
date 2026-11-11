@@ -11,6 +11,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
+    "check": "npm run typecheck && npm test",
     "test": "node --import ./tests/register.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/**/*.test.ts\"",
     "icons": "node scripts/generate-icons.mjs",
     "icons:menu": "electron scripts/generate-menu-icons.cjs",
