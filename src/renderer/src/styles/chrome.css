@@ -589,8 +589,16 @@
   .pill {
     padding-left: 8px;
   }
-  .filters .pill:first-child .pill__label {
+  /* "All" has no store mark, and a collection is only its name: both keep their label. */
+  .filters .pill:first-child .pill__label,
+  .pill--collection .pill__label {
     display: inline;
+  }
+  .pill--collection {
+    padding-left: 11px;
+  }
+  .pill--collection .pill__label {
+    max-width: 9em;
   }
   .size-slider input {
     width: 80px;
