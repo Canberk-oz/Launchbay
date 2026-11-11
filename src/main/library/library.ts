@@ -13,7 +13,7 @@ import { createLogger } from '../util/log'
 import { addedAtFrom } from './addedAt'
 import { normalizeCache, normalizeUserData, type LibraryCache, type StoredGame, type UserData, type UserGameState } from './cacheFormat'
 import type { WatchTarget } from '../launchWatch'
-import { trackSessions } from './sessions'
+import { skipSessionTime, trackSessions } from './sessions'
 import type { MediaService } from './media'
 import { SizeService } from './sizes'
 
@@ -155,6 +155,11 @@ export class LibraryService extends EventEmitter {
       if (previous.has(id) !== ids.has(id) && this.games.has(id)) this.touch(id)
     }
     for (const { id } of ended) if (this.games.has(id)) this.touch(id)
+  }
+
+  /** The PC slept for `ms`: games left running across the sleep aren't credited with it. */
+  skipSessionTime(ms: number): void {
+    skipSessionTime(this.sessionStarts, ms)
   }
 
   list(): Game[] {

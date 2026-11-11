@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, protocol } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, powerMonitor, protocol } from 'electron'
 import { join } from 'node:path'
 import { acceleratorKeys } from '@shared/accelerator'
 import { IPC } from '@shared/ipc'
@@ -90,6 +90,15 @@ async function main(): Promise<void> {
   // confirmed, or a game it saw start is still running (see processWatch.ts).
   const watcher = new ProcessWatcher(() => library.watchTargets())
   watcher.on('running', (ids: ReadonlySet<string>) => library.setRunning(ids))
+  // A game left running while the PC sleeps isn't being played: leave the sleep out of its session.
+  let suspendedAt: number | null = null
+  powerMonitor.on('suspend', () => {
+    suspendedAt = Date.now()
+  })
+  powerMonitor.on('resume', () => {
+    if (suspendedAt !== null) library.skipSessionTime(Date.now() - suspendedAt)
+    suspendedAt = null
+  })
   const launcher = new LaunchService(library, watcher)
   const actions = new GameActions(library, launcher, media)
   const windows = new WindowManager(root, {

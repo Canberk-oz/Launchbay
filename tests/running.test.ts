@@ -108,3 +108,23 @@ test('playtime: the store figure is plain; Launchbay-tracked time is always flag
   assert.deepEqual(playtimeInfo({ playtimeMinutes: null, trackedMinutes: 95 }), { value: '1.6 h', trackedByLaunchbay: true })
   assert.equal(playtimeInfo({ playtimeMinutes: null, trackedMinutes: null }), null)
 })
+
+test('sessions: time the PC spent asleep is not counted as playtime', async () => {
+  const { skipSessionTime, trackSessions } = await import('../src/main/library/sessions')
+  const starts = new Map<string, number>()
+  const t0 = 1_000_000
+  trackSessions(starts, new Set(['epic:A']), t0)
+  // Played 10 minutes, then the lid closed for 8 hours with the game still open.
+  const asleep = 8 * 3600_000
+  skipSessionTime(starts, asleep)
+  const { ended } = trackSessions(starts, new Set(), t0 + 10 * 60_000 + asleep + 5 * 60_000)
+  assert.deepEqual(ended, [{ id: 'epic:A', seconds: 15 * 60 }])
+
+  // A nonsense gap changes nothing, and a gap longer than the session can't produce negative time.
+  trackSessions(starts, new Set(['epic:B']), t0)
+  skipSessionTime(starts, -5)
+  skipSessionTime(starts, Number.NaN)
+  assert.equal(starts.get('epic:B'), t0)
+  skipSessionTime(starts, 60_000)
+  assert.deepEqual(trackSessions(starts, new Set(), t0 + 1000).ended, [])
+})

@@ -29,3 +29,12 @@ export function trackSessions(starts: Map<string, number>, running: ReadonlySet<
   }
   return change
 }
+
+/**
+ * Pure: the PC was asleep for `gapMs`. Sessions open across the sleep don't
+ * count that time, so each start moves forward by the length of the gap.
+ */
+export function skipSessionTime(starts: Map<string, number>, gapMs: number): void {
+  if (!(gapMs > 0)) return
+  for (const [id, since] of starts) starts.set(id, since + gapMs)
+}
