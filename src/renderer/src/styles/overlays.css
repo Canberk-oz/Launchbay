@@ -352,6 +352,10 @@
   transform: scale(1.04);
 }
 
+.shots__item:active img {
+  transform: scale(1);
+}
+
 .shots__item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -410,6 +414,11 @@
   background: none;
   color: var(--ink-2);
   cursor: pointer;
+}
+
+.chip__remove:active,
+.chip--add:active {
+  transform: scale(0.92);
 }
 
 .chip__remove:hover,
@@ -700,7 +709,17 @@
   background: var(--ink-2);
   transition:
     transform 200ms var(--ease-out),
+    width 140ms var(--ease-out),
     background 160ms;
+}
+
+/* The knob stretches toward where it is about to go while the switch is held. */
+.switch:active:not(:disabled) .switch__knob {
+  width: 18px;
+}
+
+.switch.is-on:active:not(:disabled) .switch__knob {
+  transform: translateX(12px);
 }
 
 .switch.is-on {
@@ -891,6 +910,12 @@
   }
   .toast {
     animation-name: fade-in;
+  }
+  .pill:active,
+  .segmented button:active,
+  .chip__remove:active,
+  .chip--add:active {
+    transform: none;
   }
   .toast.is-leaving {
     animation-name: fade-out;
