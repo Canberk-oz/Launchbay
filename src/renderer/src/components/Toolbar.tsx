@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { PLATFORM_LABELS, TILE_SIZE_MAX, TILE_SIZE_MIN, type SortMode } from '@shared/types'
 import { refreshLibrary, updateSettings } from '../actions'
 import { collectionsOf } from '@shared/collections'
@@ -16,6 +16,45 @@ import {
 
 const FILTERS: PlatformFilter[] = ['all', 'steam', 'epic', 'xbox']
 
+/**
+ * The filter row scrolls sideways when the pills don't fit (many collections,
+ * a narrow window). This makes that reachable and visible: the wheel scrolls
+ * it, the selected pill is kept in view, and `edges` says which sides have
+ * more so the row can fade there.
+ */
+function useScrollableRow(deps: unknown[]): { ref: React.RefObject<HTMLDivElement | null>; edges: { start: boolean; end: boolean } } {
+  const ref = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ start: false, end: false })
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = (): void => {
+      const start = el.scrollLeft > 1
+      const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+    }
+    const onWheel = (e: WheelEvent): void => {
+      if (el.scrollWidth <= el.clientWidth || e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    el.addEventListener('scroll', update, { passive: true })
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      observer.disconnect()
+      el.removeEventListener('scroll', update)
+      el.removeEventListener('wheel', onWheel)
+    }
+    // `deps` lists what changes the row's content (its width is observed).
+  }, deps)
+
+  return { ref, edges }
+}
+
 export function Toolbar(): React.JSX.Element {
   const games = useStore((s) => s.games)
   const filter = useStore((s) => s.filter)
@@ -27,18 +66,28 @@ export function Toolbar(): React.JSX.Element {
   const collections = useMemo(() => collectionsOf(games), [games])
   const isList = viewMode === 'list'
   const fill = ((tileSize - TILE_SIZE_MIN) / (TILE_SIZE_MAX - TILE_SIZE_MIN)) * 100
+  const row = useScrollableRow([collections.length])
+
+  // Picking a filter (or having one picked: a collection made from Properties) keeps its pill in view.
+  useEffect(() => {
+    row.ref.current?.querySelector('.pill.is-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [filter, row.ref])
 
   return (
     <div className="toolbar">
-      <div className="filters" role="tablist" aria-label="Filter by store or collection">
+      <div
+        ref={row.ref}
+        className={`filters${row.edges.start ? ' has-more-start' : ''}${row.edges.end ? ' has-more-end' : ''}`}
+        role="group"
+        aria-label="Filter by store or collection"
+      >
         {FILTERS.map((p) => {
           const active = filter === p
           const empty = p !== 'all' && counts[p] === 0
           return (
             <button
               key={p}
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               className={`pill${active ? ' is-active' : ''}${empty ? ' is-empty' : ''}`}
               onClick={() => useStore.setState({ filter: p })}
               title={empty ? `No ${PLATFORM_LABELS[p as Exclude<PlatformFilter, 'all'>]} games found on this PC` : undefined}
@@ -56,8 +105,7 @@ export function Toolbar(): React.JSX.Element {
           return (
             <button
               key={c.name}
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               className={`pill pill--collection${active ? ' is-active' : ''}${c.count === 0 ? ' is-empty' : ''}`}
               onClick={() => useStore.setState({ filter: value })}
               title={`Collection: ${c.name}`}

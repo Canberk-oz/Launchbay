@@ -314,6 +314,19 @@
   flex: none;
 }
 
+/* More pills off either side: the row fades out there instead of ending in a cut-off capsule. */
+.filters.has-more-start {
+  mask-image: linear-gradient(to right, transparent, #000 28px);
+}
+
+.filters.has-more-end {
+  mask-image: linear-gradient(to left, transparent, #000 28px);
+}
+
+.filters.has-more-start.has-more-end {
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
+
 /* Stores | collections */
 .filters__rule {
   flex: none;
