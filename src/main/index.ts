@@ -19,6 +19,11 @@ import { WindowManager } from './window'
 
 const log = createLogger('app')
 
+// A stray error in a background job (a scan, a download) is logged, not shown
+// as Electron's raw error dialog; the app keeps running in the tray.
+process.on('uncaughtException', (err) => log.error('uncaught exception', err))
+process.on('unhandledRejection', (reason) => log.error('unhandled promise rejection', reason))
+
 // Cached covers and trailers are served from disk over glmedia://. `stream`
 // lets <video> make range requests against it.
 protocol.registerSchemesAsPrivileged([

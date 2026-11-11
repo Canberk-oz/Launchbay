@@ -7,6 +7,7 @@ import './styles/overlays.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { CrashScreen, ErrorBoundary } from './components/Crash'
 import type { LibraryPatch } from '@shared/types'
 import { applyPatch, hydrate, useStore } from './store'
 
@@ -26,9 +27,15 @@ async function start(): Promise<void> {
   if (!initial.isPackaged) Object.assign(window, { __launchbayStore: useStore })
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </StrictMode>
   )
 }
 
-void start()
+start().catch((error: unknown) => {
+  // The main process didn't answer, or the first render threw: say so rather than staying blank.
+  console.error('Launchbay could not start', error)
+  createRoot(document.getElementById('root')!).render(<CrashScreen title="Launchbay couldn’t start" error={error} />)
+})

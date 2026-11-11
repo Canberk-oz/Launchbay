@@ -3,11 +3,16 @@ import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { WindowVisibility } from '@shared/types'
 import { JsonStore } from './util/fsutil'
+import { createLogger } from './util/log'
+
+const log = createLogger('window')
 
 const BACKGROUND = '#0d0d0f'
 const TITLE_BAR_HEIGHT = 44
 const SHOW_MS = 170
 const HIDE_MS = 140
+// A renderer that keeps dying is reloaded at most this often.
+const CRASH_RELOAD_GAP_MS = 10_000
 
 interface WindowState {
   bounds: Rectangle | null
@@ -130,6 +135,18 @@ export class WindowManager {
         }
       })
     }
+
+    // A crashed renderer leaves a blank window; load the UI again (the library is in the main process).
+    let lastCrashReload = 0
+    win.webContents.on('render-process-gone', (_event, details) => {
+      log.error(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`)
+      if (details.reason === 'clean-exit' || win.isDestroyed()) return
+      if (Date.now() - lastCrashReload < CRASH_RELOAD_GAP_MS) return
+      lastCrashReload = Date.now()
+      win.webContents.reload()
+    })
+    win.on('unresponsive', () => log.warn('window is not responding'))
+    win.on('responsive', () => log.info('window is responding again'))
 
     // Links never navigate the app window.
     win.webContents.setWindowOpenHandler(({ url }) => {

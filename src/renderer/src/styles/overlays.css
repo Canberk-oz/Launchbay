@@ -827,6 +827,43 @@
   overflow-wrap: anywhere;
 }
 
+/* The fallback for a UI that can't start or a render that threw. */
+.crash {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 14px;
+  height: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: var(--edge);
+}
+
+.crash__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  font-stretch: 88%;
+  letter-spacing: -0.01em;
+}
+
+.crash__body {
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.crash__detail {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-ctl);
+  background: var(--layer);
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 @keyframes fade-out {
   to {
     opacity: 0;
