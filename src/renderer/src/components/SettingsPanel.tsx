@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PLATFORM_LABELS, PLATFORMS, type MediaCacheInfo, type Settings } from '@shared/types'
-import { closeSettings, exportLibrary, openDiskUsage, refreshLibrary, unhideGame, updateSettings } from '../actions'
+import { closeSettings, exportLibrary, openDiskUsage, pushToast, refreshLibrary, unhideGame, updateSettings } from '../actions'
 import { formatBytes, formatRelative, plural } from '../lib/format'
 import { useStore } from '../store'
 import { HotkeyRecorder } from './HotkeyRecorder'
@@ -51,8 +51,24 @@ function SettingsBody(): React.JSX.Element {
   const [cache, setCache] = useState<MediaCacheInfo | null>(null)
   const [clearing, setClearing] = useState(false)
 
+  // Measured when the sheet opens, then again once library changes settle
+  // (a cover sync sends many patches; each measurement stats every cached file).
+  const measured = useRef(false)
   useEffect(() => {
-    void api.getMediaCacheInfo().then(setCache)
+    let live = true
+    const measure = (): void =>
+      void api.getMediaCacheInfo().then(
+        (info) => {
+          measured.current = true
+          if (live) setCache(info)
+        },
+        () => undefined
+      )
+    const timer = setTimeout(measure, measured.current ? 1200 : 0)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
   }, [games])
 
   const counts = useMemo(() => {
@@ -167,9 +183,14 @@ function SettingsBody(): React.JSX.Element {
             disabled={clearing || !cache?.trailerBytes}
             onClick={async () => {
               setClearing(true)
-              await api.clearTrailerCache()
-              setCache(await api.getMediaCacheInfo())
-              setClearing(false)
+              try {
+                await api.clearTrailerCache()
+                setCache(await api.getMediaCacheInfo())
+              } catch {
+                pushToast({ tone: 'error', title: 'Couldn’t clear the previews', message: 'Some files may be in use. Try again in a moment.' })
+              } finally {
+                setClearing(false)
+              }
             }}
           >
             Clear previews
