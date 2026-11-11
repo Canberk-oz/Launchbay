@@ -275,6 +275,13 @@
   text-decoration: underline;
   text-decoration-color: var(--rule-3);
   text-underline-offset: 3px;
+  transition:
+    color 120ms,
+    text-decoration-color 120ms;
+}
+
+.link-btn:active {
+  color: var(--accent);
 }
 
 .link-btn:hover {
@@ -304,6 +311,43 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* Many collections scroll sideways rather than squeezing the controls. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+
+.filters > .pill {
+  flex: none;
+}
+
+/* More pills off either side: the row fades out there instead of ending in a cut-off capsule. */
+.filters.has-more-start {
+  mask-image: linear-gradient(to right, transparent, #000 28px);
+}
+
+.filters.has-more-end {
+  mask-image: linear-gradient(to left, transparent, #000 28px);
+}
+
+.filters.has-more-start.has-more-end {
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
+
+/* Stores | collections */
+.filters__rule {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--rule-2);
+}
+
+.pill--collection .pill__label {
+  max-width: 14em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Capsule filter with a count chip; the chip inverts when the filter is on. */
@@ -322,7 +366,14 @@
   transition:
     background 140ms,
     color 140ms,
-    box-shadow 140ms;
+    box-shadow 140ms,
+    transform 90ms var(--ease-out);
+}
+
+/* Pressed controls give a little, like a key going down. */
+.pill:active,
+.segmented button:active {
+  transform: scale(0.96);
 }
 
 .pill svg {
@@ -506,7 +557,8 @@
   color: var(--ink-3);
   transition:
     background 120ms,
-    color 120ms;
+    color 120ms,
+    transform 90ms var(--ease-out);
 }
 
 .segmented button:hover {
@@ -537,8 +589,16 @@
   .pill {
     padding-left: 8px;
   }
-  .filters .pill:first-child .pill__label {
+  /* "All" has no store mark, and a collection is only its name: both keep their label. */
+  .filters .pill:first-child .pill__label,
+  .pill--collection .pill__label {
     display: inline;
+  }
+  .pill--collection {
+    padding-left: 11px;
+  }
+  .pill--collection .pill__label {
+    max-width: 9em;
   }
   .size-slider input {
     width: 80px;

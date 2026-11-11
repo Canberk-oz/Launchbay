@@ -3,11 +3,16 @@ import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { WindowVisibility } from '@shared/types'
 import { JsonStore } from './util/fsutil'
+import { createLogger } from './util/log'
+
+const log = createLogger('window')
 
 const BACKGROUND = '#0d0d0f'
 const TITLE_BAR_HEIGHT = 44
 const SHOW_MS = 170
 const HIDE_MS = 140
+// A renderer that keeps dying is reloaded at most this often.
+const CRASH_RELOAD_GAP_MS = 10_000
 
 interface WindowState {
   bounds: Rectangle | null
@@ -45,6 +50,9 @@ export class WindowManager {
   win: BrowserWindow | null = null
   private overlay = false
   private fadeCancel: (() => void) | null = null
+  /** Bumped by every show, so a hide still fading out knows it was overtaken. */
+  private showSeq = 0
+  private hiding: Promise<void> | null = null
   private readonly state: JsonStore<WindowState>
   private readonly policy: WindowPolicy
 
@@ -128,6 +136,18 @@ export class WindowManager {
       })
     }
 
+    // A crashed renderer leaves a blank window; load the UI again (the library is in the main process).
+    let lastCrashReload = 0
+    win.webContents.on('render-process-gone', (_event, details) => {
+      log.error(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`)
+      if (details.reason === 'clean-exit' || win.isDestroyed()) return
+      if (Date.now() - lastCrashReload < CRASH_RELOAD_GAP_MS) return
+      lastCrashReload = Date.now()
+      win.webContents.reload()
+    })
+    win.on('unresponsive', () => log.warn('window is not responding'))
+    win.on('responsive', () => log.info('window is responding again'))
+
     // Links never navigate the app window.
     win.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:\/\//.test(url)) void shell.openExternal(url)
@@ -179,6 +199,8 @@ export class WindowManager {
   showNormal(): void {
     const win = this.win
     if (!win) return
+    this.showSeq++
+    this.hiding = null
     this.fadeCancel?.()
     this.overlay = false
     win.setAlwaysOnTop(false)
@@ -200,11 +222,16 @@ export class WindowManager {
     const win = this.win
     if (!win) return
     const alreadyVisible = win.isVisible() && !win.isMinimized()
+    this.showSeq++
+    this.hiding = null
+    this.fadeCancel?.() // a hide still fading out is overtaken
     this.overlay = true
     if (!alreadyVisible) {
       win.setOpacity(0)
       if (win.isMinimized()) win.restore()
       if (!win.isMaximized()) this.centerOnCursorDisplay()
+    } else {
+      win.setOpacity(1)
     }
     win.setAlwaysOnTop(true, 'screen-saver')
     win.show()
@@ -214,12 +241,24 @@ export class WindowManager {
     if (!alreadyVisible) await this.fade(0, 1, SHOW_MS)
   }
 
-  async hide(): Promise<void> {
+  hide(): Promise<void> {
+    if (!this.hiding) {
+      const job = this.fadeOut().finally(() => {
+        if (this.hiding === job) this.hiding = null
+      })
+      this.hiding = job
+    }
+    return this.hiding
+  }
+
+  private async fadeOut(): Promise<void> {
     const win = this.win
     if (!win || !win.isVisible()) return
+    const seq = this.showSeq
     this.send('hide')
     await this.fade(win.getOpacity(), 0, HIDE_MS)
-    if (win.isDestroyed()) return
+    // Shown again (tray, second launch, the hotkey) while fading out: that show wins.
+    if (win.isDestroyed() || seq !== this.showSeq) return
     win.hide()
     win.setOpacity(1)
     win.setAlwaysOnTop(false)

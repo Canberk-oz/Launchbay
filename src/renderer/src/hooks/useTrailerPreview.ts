@@ -25,6 +25,9 @@ export interface TrailerPreview {
   }
 }
 
+/** With reduced motion asked for, covers stay still: no video starts by itself on hover. */
+const prefersReducedMotion = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 export function useTrailerPreview(game: Game): TrailerPreview {
   const canPreview = game.trailerState !== 'none'
   const [phase, setPhase] = useState<PreviewPhase>('idle')
@@ -57,7 +60,7 @@ export function useTrailerPreview(game: Game): TrailerPreview {
 
   const onPointerEnter = useCallback(() => {
     hovering.current = true
-    if (!canPreview) return
+    if (!canPreview || prefersReducedMotion()) return
     window.clearTimeout(timer.current)
     setPhase('armed')
     timer.current = window.setTimeout(async () => {

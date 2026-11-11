@@ -1,8 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import {
-  DEFAULT_HOTKEY,
-  TILE_SIZE_DEFAULT,
+  DEFAULT_SETTINGS,
   TILE_SIZE_MAX,
   TILE_SIZE_MIN,
   type Settings,
@@ -11,19 +10,8 @@ import {
 } from '@shared/types'
 import { JsonStore } from './util/fsutil'
 
-export const DEFAULT_SETTINGS: Settings = {
-  hotkey: DEFAULT_HOTKEY,
-  hotkeyEnabled: true,
-  closeToTray: true,
-  hideAfterLaunch: true,
-  launchAtLogin: false,
-  viewMode: 'grid',
-  tileSize: TILE_SIZE_DEFAULT,
-  sortMode: 'name'
-}
-
 const VIEW_MODES: ViewMode[] = ['grid', 'list']
-const SORT_MODES: SortMode[] = ['name', 'recent', 'size']
+const SORT_MODES: SortMode[] = ['name', 'recent', 'size', 'added']
 
 /** Merges untrusted input (the settings file, or a renderer patch) over a base, dropping invalid fields. */
 export function sanitizeSettings(input: unknown, base: Settings): Settings {

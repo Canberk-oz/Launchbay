@@ -6,18 +6,18 @@
 // an Xbox Live protocol, an XboxGames install folder, or game-engine files).
 
 import { promises as fs } from 'node:fs'
-import { basename, dirname, extname, join } from 'node:path'
+import { basename, dirname, extname, join, sep } from 'node:path'
 import { XMLParser } from 'fast-xml-parser'
 import { runPowerShellJson } from '../util/powershell'
 import { readImageSize } from '../util/imageSize'
 import type { CoverSource, ScannedGame } from './types'
 
-interface RawStartApp {
+export interface RawStartApp {
   Name: string
   AppID: string
 }
 
-interface RawPackage {
+export interface RawPackage {
   Name: string
   PackageFamilyName: string
   PackageFullName: string
@@ -106,12 +106,24 @@ export function isExcludedPackage(name: string): boolean {
   return EXCLUDED_PACKAGES.some((re) => re.test(name))
 }
 
+/**
+ * A visual asset a package declares. `tier` is its rank as cover art, lower
+ * first: 0 splash screen (the nearest thing a Store game has to box art),
+ * 1 large square tile, 2 wide tile, 3 small icons (a last resort).
+ */
+export interface VisualAsset {
+  reference: string
+  tier: number
+  /** The color the asset is drawn on, when the manifest declares one. */
+  background?: string
+}
+
 export interface AppxApplication {
   id: string
   displayName?: string
   hidden: boolean
   protocols: string[]
-  logos: string[]
+  visuals: VisualAsset[]
 }
 
 export interface AppxManifest {
@@ -122,7 +134,7 @@ export interface AppxManifest {
 
 export interface GameConfig {
   displayName?: string
-  logos: string[]
+  visuals: VisualAsset[]
 }
 
 const xml = new XMLParser({
@@ -140,6 +152,24 @@ const text = (v: unknown): string | undefined => {
 
 /** Resource references (ms-resource:...) cannot be shown as-is. */
 const literal = (v: string | undefined): string | undefined => (v && !/^ms-resource:/i.test(v) ? v : undefined)
+
+/** Pure: a manifest color (`#RGB`, `#RRGGBB`, `#AARRGGBB` or a named color) as CSS; undefined for transparent or invalid. */
+export function manifestColor(value: unknown): string | undefined {
+  const v = text(value)?.toLowerCase()
+  if (!v || v === 'transparent') return undefined
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(v)) return v
+  if (/^#[0-9a-f]{8}$/.test(v)) return v.startsWith('#00') ? undefined : `#${v.slice(3)}` // XAML puts alpha first
+  return /^[a-z]{3,24}$/.test(v) ? v : undefined
+}
+
+function visuals(entries: Array<[unknown, number, string | undefined]>): VisualAsset[] {
+  const out: VisualAsset[] = []
+  for (const [value, tier, background] of entries) {
+    const reference = text(value)
+    if (reference) out.push({ reference, tier, ...(background ? { background } : {}) })
+  }
+  return out
+}
 
 type Node = Record<string, unknown>
 
@@ -162,15 +192,20 @@ export function parseAppxManifest(source: string): AppxManifest | null {
         .filter((e) => e.Category === 'windows.protocol')
         .flatMap((e) => ((e.Protocol ?? []) as Node[]).map((p) => String(p.Name ?? '')))
         .filter(Boolean)
-      const logos = [tile.Square310x310Logo, ve.Square150x150Logo, tile.Wide310x150Logo, ve.Square44x44Logo]
-        .map((v) => text(v))
-        .filter((v): v is string => !!v)
+      const splash = (ve.SplashScreen ?? {}) as Node
+      const tileColor = manifestColor(ve.BackgroundColor)
       return {
         id: String(app.Id ?? 'App'),
         displayName: text(ve.DisplayName),
         hidden: String(ve.AppListEntry ?? '').toLowerCase() === 'none',
         protocols,
-        logos
+        visuals: visuals([
+          [splash.Image, 0, manifestColor(splash.BackgroundColor) ?? tileColor],
+          [tile.Square310x310Logo, 1, tileColor],
+          [tile.Wide310x150Logo, 2, tileColor],
+          [ve.Square150x150Logo, 3, tileColor],
+          [ve.Square44x44Logo, 3, tileColor]
+        ])
       }
     })
   }
@@ -180,12 +215,17 @@ export function parseAppxManifest(source: string): AppxManifest | null {
 export function parseGameConfig(source: string): GameConfig | null {
   const doc = xml.parse(source) as { Game?: Node }
   if (!doc.Game) return null
-  const visuals = (doc.Game.ShellVisuals ?? {}) as Node
+  const shell = (doc.Game.ShellVisuals ?? {}) as Node
+  const color = manifestColor(shell.BackgroundColor)
   return {
-    displayName: text(visuals.DefaultDisplayName),
-    logos: [visuals.Square480x480Logo, visuals.Square150x150Logo, visuals.SplashScreenImage, visuals.StoreLogo]
-      .map((v) => text(v))
-      .filter((v): v is string => !!v)
+    displayName: text(shell.DefaultDisplayName),
+    visuals: visuals([
+      [shell.SplashScreenImage, 0, color],
+      [shell.Square480x480Logo, 1, color],
+      [shell.Square150x150Logo, 3, color],
+      [shell.Square44x44Logo, 3, color],
+      [shell.StoreLogo, 3, color]
+    ])
   }
 }
 
@@ -206,7 +246,8 @@ export function gameSignals(input: {
 
 interface AssetCandidate {
   path: string
-  score: number
+  /** Pixel area; variants of one asset share an aspect ratio, so bigger is sharper. */
+  area: number
 }
 
 /**
@@ -215,7 +256,7 @@ interface AssetCandidate {
  * `scale-200\Logo.png`, ...), skipping high-contrast variants.
  */
 async function resolveAsset(root: string, reference: string): Promise<AssetCandidate | null> {
-  const full = join(root, reference.replace(/\//g, '\\'))
+  const full = join(root, reference.replace(/[\\/]/g, sep))
   const dir = dirname(full)
   const ext = extname(full).toLowerCase()
   const stem = basename(full, extname(full)).toLowerCase()
@@ -252,12 +293,37 @@ async function resolveAsset(root: string, reference: string): Promise<AssetCandi
   for (const path of files) {
     const size = await readImageSize(path)
     if (!size) continue
-    // Largest centered square: favors big square art over wide banners.
-    let score = Math.min(size.width, size.height) ** 2
-    if (/altform-(light)?unplated/i.test(path)) score *= 0.9
-    if (!best || score > best.score) best = { path, score }
+    let area = size.width * size.height
+    if (/altform-(light)?unplated/i.test(path)) area *= 0.9
+    if (!best || area > best.area) best = { path, area }
   }
   return best
+}
+
+/**
+ * Resolves each declared asset to its sharpest file on disk. Every distinct
+ * file goes to the media cache in tier order; it makes the final pick once it
+ * can look at the pixels (see `pickArtwork`).
+ */
+export async function coverSourcesFor(root: string, assets: VisualAsset[]): Promise<CoverSource[]> {
+  const resolved = await Promise.all(
+    assets.map(async (asset) => ({ asset, file: await resolveAsset(root, asset.reference) }))
+  )
+  const byPath = new Map<string, { asset: VisualAsset; file: AssetCandidate }>()
+  for (const entry of resolved) {
+    if (!entry.file) continue
+    const key = entry.file.path.toLowerCase()
+    const seen = byPath.get(key)
+    if (!seen || entry.asset.tier < seen.asset.tier) byPath.set(key, { asset: entry.asset, file: entry.file })
+  }
+  return [...byPath.values()]
+    .sort((a, b) => a.asset.tier - b.asset.tier || b.file.area - a.file.area)
+    .map(({ asset, file }) => ({
+      kind: 'file',
+      path: file.path,
+      tier: asset.tier,
+      ...(asset.background ? { background: asset.background } : {})
+    }))
 }
 
 async function inspectPackage(pkg: RawPackage): Promise<ScannedGame | null> {
@@ -302,15 +368,11 @@ async function inspectPackage(pkg: RawPackage): Promise<ScannedGame | null> {
     literal(app.displayName) ||
     pkg.Name
 
-  const references = [...(gameConfig?.logos ?? []), ...app.logos, ...(manifest.logo ? [manifest.logo] : [])]
-  const resolved = (await Promise.all(references.map((r) => resolveAsset(root, r)))).filter(
-    (c): c is AssetCandidate => c !== null
-  )
-  // Every distinct candidate goes to the media cache, which picks the one with
-  // the most visible artwork once it can look at the pixels.
-  const coverSources: CoverSource[] = [...new Map(resolved.map((c) => [c.path.toLowerCase(), c])).values()]
-    .sort((a, b) => b.score - a.score)
-    .map((c) => ({ kind: 'file', path: c.path }))
+  const coverSources = await coverSourcesFor(root, [
+    ...(gameConfig?.visuals ?? []),
+    ...app.visuals,
+    ...(manifest.logo ? [{ reference: manifest.logo, tier: 3 }] : [])
+  ])
 
   return {
     platform: 'xbox',
@@ -319,20 +381,30 @@ async function inspectPackage(pkg: RawPackage): Promise<ScannedGame | null> {
     installPath: root,
     launchCommand: `shell:AppsFolder\\${pkg.PackageFamilyName}!${appId}`,
     sizeOnDisk: null,
+    // Store packages report no size; the full name carries the version, so an update re-measures.
+    sizeKey: pkg.PackageFullName || pkg.PackageFamilyName,
     playtimeMinutes: null,
     lastPlayed: null,
+    updateAvailable: null,
     coverSources
   }
 }
 
-export async function scanXbox(): Promise<ScannedGame[]> {
-  let packages: RawPackage[] | RawPackage | null
-  try {
-    packages = await runPowerShellJson<RawPackage[] | RawPackage | null>(LIST_PACKAGES_SCRIPT, { timeoutMs: 60_000 })
-  } catch {
-    return [] // PowerShell or the Appx module unavailable
-  }
-  const list = Array.isArray(packages) ? packages : packages ? [packages] : []
-  const games = await Promise.all(list.map((p) => inspectPackage(p).catch(() => null)))
+/** Lists packaged apps; replaced in tests. */
+export type PackageLister = () => Promise<RawPackage[] | RawPackage | null>
+
+const listPackages: PackageLister = () =>
+  runPowerShellJson<RawPackage[] | RawPackage | null>(LIST_PACKAGES_SCRIPT, { timeoutMs: 60_000 })
+
+/**
+ * Packaged apps are part of Windows itself, so there is no "not installed"
+ * case: when the package list can't be read (PowerShell blocked, timed out,
+ * the Appx module failing), this throws and the library keeps the last known
+ * Xbox games.
+ */
+export async function scanXbox(list: PackageLister = listPackages): Promise<ScannedGame[]> {
+  const packages = await list()
+  const all = Array.isArray(packages) ? packages : packages ? [packages] : []
+  const games = await Promise.all(all.map((p) => inspectPackage(p).catch(() => null)))
   return games.filter((g): g is ScannedGame => g !== null)
 }

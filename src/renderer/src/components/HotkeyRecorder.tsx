@@ -68,14 +68,24 @@ export function HotkeyRecorder(): React.JSX.Element {
         )
       })
     }
+    // Recording holds the global shortcut released. If the window loses focus
+    // or is hidden meanwhile, stop, or the shortcut could no longer bring it back.
+    const cancel = (): void => setRecording(false)
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('keyup', onKey, true)
+    window.addEventListener('blur', cancel)
     return () => {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKey, true)
+      window.removeEventListener('blur', cancel)
       void api.suspendHotkey(false)
     }
   }, [recording])
+
+  const windowHidden = useStore((s) => s.windowHidden)
+  useEffect(() => {
+    if (windowHidden) setRecording(false)
+  }, [windowHidden])
 
   const problem = enabled && !status.registered && status.error !== null && !recording
 

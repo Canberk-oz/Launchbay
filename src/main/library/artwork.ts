@@ -1,66 +1,72 @@
-import { nativeImage } from 'electron'
+import { nativeImage, type NativeImage } from 'electron'
+import type { CoverFrame } from '@shared/types'
 import { imageExtension, imageSizeFromBuffer } from '../util/imageSize'
+import { ambientFromPixels, ambientOfColor } from './ambient'
+import { frameForAspect, measureArtwork, padBox } from './framing'
 
 export interface Artwork {
   data: Buffer
   ext: 'png' | 'jpg' | 'gif' | 'webp'
-  /** A transparent logo (clear corners) rather than full-bleed cover art. */
-  logo: boolean
+  frame: CoverFrame
+  /** A mark's own solid background (#rrggbb), or null. */
+  background: string | null
   /** Side of the largest square the visible artwork fills, in pixels. */
   content: number
+  /** The glow color the cover suggests (#rrggbb), or null when it is colorless. */
+  ambient: string | null
 }
 
-const VISIBLE_ALPHA = 24
+/** Downsampled before measuring: a glow color needs no more than this. */
+const AMBIENT_SAMPLE_WIDTH = 48
+
+function ambientOf(image: NativeImage): string | null {
+  const small = image.getSize().width > AMBIENT_SAMPLE_WIDTH ? image.resize({ width: AMBIENT_SAMPLE_WIDTH, quality: 'good' }) : image
+  const { width, height } = small.getSize()
+  const data = small.toBitmap()
+  // Skia's native order on Windows (and Linux) is BGRA.
+  return data.length >= width * height * 4 ? ambientFromPixels({ data, width, height, order: 'bgra' }) : null
+}
+
+/** The glow color of an already cached cover (JPEG or PNG), or null. */
+export function ambientColor(data: Buffer): string | null {
+  const image = nativeImage.createFromBuffer(data)
+  return image.isEmpty() ? null : ambientOf(image)
+}
 
 /**
- * Looks at an image's pixels. Package logos (Xbox/Store apps) often sit small
- * inside a large transparent canvas; this measures the visible artwork, trims
- * the empty margin, and reports whether the image is a transparent logo, so
- * the renderer can print it on a box front instead of floating it in a void.
+ * Looks at an image's pixels to decide how it fills a tile (see framing.ts)
+ * and what color a glow around it should take (see ambient.ts). Package logos
+ * (Xbox/Store apps) often sit small inside a large transparent or single-color
+ * canvas; for those the empty margin is trimmed so the renderer can center the
+ * artwork itself on a full-bleed background.
+ *
+ * Framing decodes only PNGs: JPEGs come from store CDNs and are always art.
+ * Every PNG and JPEG is decoded for its ambient color.
  */
 export function analyzeArtwork(data: Buffer): Artwork | null {
   const ext = imageExtension(data)
   if (!ext) return null
   if (ext !== 'png') {
     const size = imageSizeFromBuffer(data)
-    return size ? { data, ext, logo: false, content: Math.min(size.width, size.height) } : null
+    if (!size) return null
+    const frame = frameForAspect(size.width / size.height)
+    return { data, ext, frame, background: null, content: Math.min(size.width, size.height), ambient: ext === 'jpg' ? ambientColor(data) : null }
   }
 
   const image = nativeImage.createFromBuffer(data)
   if (image.isEmpty()) return null
   const { width, height } = image.getSize()
-  const pixels = image.toBitmap() // 4 bytes per pixel, alpha last
-  if (pixels.length < width * height * 4) return { data, ext, logo: false, content: Math.min(width, height) }
-
-  let minX = width
-  let minY = height
-  let maxX = -1
-  let maxY = -1
-  for (let y = 0; y < height; y++) {
-    const row = y * width
-    for (let x = 0; x < width; x++) {
-      if (pixels[(row + x) * 4 + 3] > VISIBLE_ALPHA) {
-        if (x < minX) minX = x
-        if (x > maxX) maxX = x
-        if (y < minY) minY = y
-        if (y > maxY) maxY = y
-      }
-    }
+  const bitmap = image.toBitmap()
+  if (bitmap.length < width * height * 4) {
+    return { data, ext, frame: frameForAspect(width / height), background: null, content: Math.min(width, height), ambient: null }
   }
-  if (maxX < 0) return null // nothing visible
-
-  const alphaAt = (x: number, y: number): number => pixels[(y * width + x) * 4 + 3]
-  const logo = [alphaAt(0, 0), alphaAt(width - 1, 0), alphaAt(0, height - 1), alphaAt(width - 1, height - 1)].every(
-    (a) => a <= VISIBLE_ALPHA
-  )
-  const boxW = maxX - minX + 1
-  const boxH = maxY - minY + 1
-  const content = Math.min(boxW, boxH)
-  if (!logo || boxW * boxH > width * height * 0.9) return { data, ext, logo, content }
-
-  const pad = Math.round(Math.max(boxW, boxH) * 0.04)
-  const x = Math.max(0, minX - pad)
-  const y = Math.max(0, minY - pad)
-  const rect = { x, y, width: Math.min(width - x, boxW + pad * 2), height: Math.min(height - y, boxH + pad * 2) }
-  return { data: image.crop(rect).toPNG(), ext, logo, content }
+  // Skia's native order on Windows (and Linux) is BGRA.
+  const layout = measureArtwork({ data: bitmap, width, height, order: 'bgra' })
+  if (!layout) return null
+  const { frame, box, background, content } = layout
+  // A mark on a vivid plate glows in the plate's color when the mark itself is colorless.
+  const whole = box.width === width && box.height === height
+  const cropped = whole ? image : image.crop(padBox(box, width, height))
+  const ambient = ambientOf(cropped) ?? (background ? ambientOfColor(background) : null)
+  return { data: whole ? data : cropped.toPNG(), ext, frame, background, content, ambient }
 }

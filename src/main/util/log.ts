@@ -1,14 +1,24 @@
-import { appendFileSync, statSync, truncateSync, mkdirSync } from 'node:fs'
+import { appendFileSync, mkdirSync, renameSync, statSync, truncateSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 let logFile: string | null = null
 
-/** Starts mirroring log lines to a file, truncating it when it grows past 1 MB. */
+/**
+ * Starts mirroring log lines to a file. Past 1 MB the file becomes
+ * `<name>.old` (replacing the previous one) and a fresh one starts, so the
+ * run that led up to a problem is still there to read.
+ */
 export function initLogFile(file: string): void {
   try {
     mkdirSync(dirname(file), { recursive: true })
     try {
-      if (statSync(file).size > 1024 * 1024) truncateSync(file, 0)
+      if (statSync(file).size > 1024 * 1024) {
+        try {
+          renameSync(file, `${file}.old`)
+        } catch {
+          truncateSync(file, 0) // the old copy is locked; at least stop growing
+        }
+      }
     } catch {
       // file does not exist yet
     }

@@ -1,5 +1,5 @@
-import { openProtocolUrl } from './launchers'
-import { scanEpic } from './epicScan'
+import { openProtocolUrl, STALE_COMMAND } from './launchers'
+import { epicStorePageUrl, scanEpic } from './epicScan'
 import type { GameProvider } from './types'
 
 export const epicProvider: GameProvider = {
@@ -9,10 +9,22 @@ export const epicProvider: GameProvider = {
   scan: scanEpic,
 
   async launch(game) {
+    if (!/^com\.epicgames\.launcher:\/\//i.test(game.launchCommand)) throw new Error(STALE_COMMAND)
     await openProtocolUrl(game.launchCommand, 'The Epic Games Launcher')
   },
 
   launchWatch(game) {
     return { dirs: [game.installPath] }
+  },
+
+  storePageUrl: epicStorePageUrl,
+
+  // The launcher has no documented uninstall link, so it opens on the library.
+  uninstallHandoff(game) {
+    return {
+      url: 'com.epicgames.launcher://library',
+      via: 'the Epic Games Launcher',
+      steps: `The launcher opens on your library. Find ${game.name} there, open its ⋯ menu and choose Uninstall.`
+    }
   }
 }

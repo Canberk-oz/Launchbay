@@ -1,4 +1,4 @@
-import { dismissToast } from '../actions'
+import { dismissToast, pauseToast, resumeToast } from '../actions'
 import { useStore } from '../store'
 import { CheckIcon, CloseIcon, WarningIcon } from './Icons'
 
@@ -6,9 +6,18 @@ import { CheckIcon, CloseIcon, WarningIcon } from './Icons'
 export function Toasts(): React.JSX.Element {
   const toasts = useStore((s) => s.toasts)
   return (
-    <div className="toasts" aria-live="polite">
+    <div className="toasts" role="region" aria-label="Notifications">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast--${t.tone}`} role={t.tone === 'error' ? 'alert' : 'status'}>
+        <div
+          key={t.id}
+          className={`toast toast--${t.tone}${t.leaving ? ' is-leaving' : ''}`}
+          role={t.tone === 'error' ? 'alert' : 'status'}
+          // Reading it, or reaching for its button, holds it on screen.
+          onPointerEnter={() => pauseToast(t.id)}
+          onPointerLeave={() => resumeToast(t.id)}
+          onFocus={() => pauseToast(t.id)}
+          onBlur={() => resumeToast(t.id)}
+        >
           <span className="toast__icon" aria-hidden="true">
             {t.tone === 'info' ? <CheckIcon size={15} /> : <WarningIcon size={15} />}
           </span>

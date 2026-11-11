@@ -1,6 +1,6 @@
 import { httpGet } from '../util/http'
-import { openProtocolUrl } from './launchers'
-import { pickTrailer, scanSteam, type SteamMovie } from './steamScan'
+import { openProtocolUrl, STALE_COMMAND } from './launchers'
+import { findScreenshots, pickTrailer, scanSteam, steamRoot, type SteamMovie } from './steamScan'
 import type { GameProvider } from './types'
 
 export const steamProvider: GameProvider = {
@@ -10,6 +10,8 @@ export const steamProvider: GameProvider = {
   scan: scanSteam,
 
   async launch(game) {
+    // The command comes from the cached scan; only ever hand Steam a steam:// link.
+    if (!/^steam:\/\//i.test(game.launchCommand)) throw new Error(STALE_COMMAND)
     await openProtocolUrl(game.launchCommand, 'Steam')
   },
 
@@ -25,5 +27,23 @@ export const steamProvider: GameProvider = {
 
   launchWatch(game) {
     return { dirs: [game.installPath], steamAppId: game.platformId }
+  },
+
+  async screenshots(game) {
+    const root = await steamRoot()
+    return root ? findScreenshots(root, game.platformId) : []
+  },
+
+  uninstallHandoff(game) {
+    if (!/^\d+$/.test(game.platformId)) return null
+    return {
+      url: `steam://uninstall/${game.platformId}`,
+      via: 'Steam',
+      steps: 'Steam asks you to confirm, then removes the game.'
+    }
+  },
+
+  storePageUrl(game) {
+    return /^\d+$/.test(game.platformId) ? `steam://store/${game.platformId}` : null
   }
 }

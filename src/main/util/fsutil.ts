@@ -1,5 +1,9 @@
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
+import { sleep } from './concurrency'
+import { createLogger } from './log'
+
+const log = createLogger('store')
 
 export async function pathExists(p: string): Promise<boolean> {
   try {
@@ -22,25 +26,27 @@ export function stripBom(s: string): string {
   return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
 }
 
-export async function readJsonFile<T>(file: string): Promise<T | null> {
-  try {
-    return JSON.parse(stripBom(await fs.readFile(file, 'utf8'))) as T
-  } catch {
-    return null
-  }
-}
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
-
 /**
  * Writes via a temp file and rename so a crash mid-write never leaves a
  * truncated cache. Windows can briefly refuse the rename while antivirus or
- * the indexer holds the target, so it retries a few times.
+ * the indexer holds the target, so it retries a few times. `durable` also
+ * flushes the data to disk before the rename, so a power cut can't leave an
+ * empty file under the final name (worth it for the user's own data).
  */
-export async function writeFileAtomic(file: string, data: string | Uint8Array): Promise<void> {
+export async function writeFileAtomic(file: string, data: string | Uint8Array, opts: { durable?: boolean } = {}): Promise<void> {
   await fs.mkdir(dirname(file), { recursive: true })
   const tmp = `${file}.${process.pid}.${Date.now().toString(36)}.tmp`
-  await fs.writeFile(tmp, data)
+  if (opts.durable) {
+    const handle = await fs.open(tmp, 'w')
+    try {
+      await handle.writeFile(data)
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+  } else {
+    await fs.writeFile(tmp, data)
+  }
   for (let attempt = 0; ; attempt++) {
     try {
       await fs.rename(tmp, file)
@@ -56,9 +62,44 @@ export async function writeFileAtomic(file: string, data: string | Uint8Array): 
   }
 }
 
+export type JsonRead = { state: 'ok'; value: unknown } | { state: 'missing' } | { state: 'damaged'; error: string }
+
+/**
+ * Reads a JSON file and says which of three things happened: it parsed, it
+ * isn't there, or it is there but can't be used (unreadable, empty, or not
+ * JSON). Only the last is a problem: defaults must not silently replace it.
+ */
+export async function readJsonState(file: string): Promise<JsonRead> {
+  let text: string
+  for (let attempt = 0; ; attempt++) {
+    try {
+      text = await fs.readFile(file, 'utf8')
+      break
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') return { state: 'missing' }
+      // Antivirus or the indexer can hold a file for a moment on Windows.
+      if (attempt < 3 && (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')) {
+        await sleep(60 * (attempt + 1))
+        continue
+      }
+      return { state: 'damaged', error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+  try {
+    return { state: 'ok', value: JSON.parse(stripBom(text)) }
+  } catch (err) {
+    return { state: 'damaged', error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 /**
  * A JSON document persisted with debounced atomic writes. Callers mutate
  * `data` and call `save()`; bursts of changes collapse into one write.
+ *
+ * A file that exists but can't be read or parsed is never overwritten in
+ * place: the first save moves it aside (`name.damaged-<time>.json`) first,
+ * so favorites, collections and tracked playtime can still be recovered.
  */
 export class JsonStore<T> {
   data: T
@@ -66,6 +107,7 @@ export class JsonStore<T> {
   private timer: NodeJS.Timeout | null = null
   private writing: Promise<void> = Promise.resolve()
   private readonly delayMs: number
+  private damaged = false
 
   constructor(file: string, initial: T, delayMs = 400) {
     this.file = file
@@ -74,8 +116,12 @@ export class JsonStore<T> {
   }
 
   async load(normalize: (raw: unknown) => T): Promise<T> {
-    const raw = await readJsonFile<unknown>(this.file)
-    this.data = normalize(raw)
+    const read = await readJsonState(this.file)
+    if (read.state === 'damaged') {
+      this.damaged = true
+      log.error(`${this.file} could not be read (${read.error}); starting from defaults and keeping the file as a .damaged copy`)
+    }
+    this.data = normalize(read.state === 'ok' ? read.value : null)
     return this.data
   }
 
@@ -93,8 +139,25 @@ export class JsonStore<T> {
       this.timer = null
     }
     const json = JSON.stringify(this.data)
-    this.writing = this.writing.then(() => writeFileAtomic(this.file, json)).catch(() => undefined)
+    this.writing = this.writing
+      .then(() => this.setDamagedAside())
+      .then(() => writeFileAtomic(this.file, json, { durable: true }))
+      .catch((err) => log.error(`could not save ${this.file}; the change stays in memory until the next save`, err))
     await this.writing
+  }
+
+  /** Before the first write over a file that failed to load, keep that file under another name. */
+  private async setDamagedAside(): Promise<void> {
+    if (!this.damaged) return
+    this.damaged = false
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, '')
+    const copy = this.file.replace(/(\.json)?$/i, `.damaged-${stamp}.json`)
+    try {
+      await fs.rename(this.file, copy)
+      log.warn(`kept the unreadable ${this.file} as ${copy}`)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`could not set ${this.file} aside before replacing it`, err)
+    }
   }
 }
 

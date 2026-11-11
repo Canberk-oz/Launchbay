@@ -6,7 +6,7 @@ import { join, win32 } from 'node:path'
 import { parseVdf, vdfObject, vdfPath, vdfString, type VdfObject } from '../util/vdf'
 import { isDirectory, pathExists } from '../util/fsutil'
 import { readRegistry } from '../util/registry'
-import type { CoverSource, ScannedGame } from './types'
+import type { CoverSource, ScannedGame, ScreenshotFile } from './types'
 
 const DEFAULT_STEAM_PATH = 'C:\\Program Files (x86)\\Steam'
 const CDN = 'https://cdn.akamai.steamstatic.com/steam/apps'
@@ -31,27 +31,43 @@ const EXCLUDED_NAMES = [
 ]
 
 // StateFlags bits (see Steam's EAppState).
+const STATE_UPDATE_REQUIRED = 2
 const STATE_FULLY_INSTALLED = 4
 const STATE_UNINSTALLING = 2048
 
-export async function findSteamPath(): Promise<string | null> {
+/** What `findSteamPath` reads from the machine; replaced in tests. */
+export interface SteamLocator {
+  readRegistry: typeof readRegistry
+  isDirectory: (path: string) => Promise<boolean>
+}
+
+const machine: SteamLocator = { readRegistry, isDirectory }
+
+/**
+ * The Steam folder, or null when Steam is not installed. Throws when the
+ * registry could not be read and the default folder is absent, because then
+ * "not installed" and "installed somewhere else" can't be told apart.
+ */
+export async function findSteamPath(env: SteamLocator = machine): Promise<string | null> {
   const candidates: string[] = []
+  let registryError: unknown = null
   try {
-    const [hkcu, hklm] = await readRegistry([
+    const [hkcu, hklm] = await env.readRegistry([
       { key: 'HKCU\\Software\\Valve\\Steam', names: ['SteamPath'] },
       { key: 'HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam', names: ['InstallPath'] }
     ])
     if (typeof hkcu?.SteamPath === 'string') candidates.push(hkcu.SteamPath)
     if (typeof hklm?.InstallPath === 'string') candidates.push(hklm.InstallPath)
-  } catch {
-    // PowerShell unavailable or blocked; fall back to the default location.
+  } catch (err) {
+    registryError = err // PowerShell unavailable or blocked; try the default location.
   }
   candidates.push(DEFAULT_STEAM_PATH)
 
   for (const candidate of candidates) {
     const normalized = win32.normalize(candidate)
-    if (await isDirectory(join(normalized, 'steamapps'))) return normalized
+    if (await env.isDirectory(join(normalized, 'steamapps'))) return normalized
   }
+  if (registryError) throw new Error('Could not read the Steam location from the registry', { cause: registryError })
   return null
 }
 
@@ -113,6 +129,11 @@ export function isPlayableManifest(m: AppManifest): boolean {
   // Fully installed, or installed and currently updating (buildid is set once
   // a first install has completed; a fresh download in progress reports 0).
   return (m.stateFlags & STATE_FULLY_INSTALLED) !== 0 || (m.buildid !== '' && m.buildid !== '0')
+}
+
+/** Pure: Steam has an update queued for this app (StateFlags UpdateRequired). */
+export function hasPendingUpdate(m: AppManifest): boolean {
+  return (m.stateFlags & STATE_UPDATE_REQUIRED) !== 0
 }
 
 async function readLibraryPaths(steamPath: string): Promise<string[]> {
@@ -247,9 +268,51 @@ async function localCacheImages(steamPath: string, appid: string): Promise<{ cap
   return { capsule, header }
 }
 
-export async function scanSteam(): Promise<ScannedGame[]> {
-  const steamPath = await findSteamPath()
+// The Steam folder found by the last scan, so screenshot lookups don't query the registry again.
+let lastSteamPath: string | null = null
+
+/** The Steam folder: the last scan's, or found now. Null when Steam isn't installed or can't be read. */
+export async function steamRoot(): Promise<string | null> {
+  return lastSteamPath ?? (await findSteamPath().catch(() => null))
+}
+
+/**
+ * Screenshots Steam keeps for an app, for every local Steam user
+ * (userdata/<account>/760/remote/<appid>/screenshots), newest first, with
+ * Steam's own thumbnails where it made them. Unreadable folders are skipped.
+ */
+export async function findScreenshots(steamPath: string, appid: string): Promise<ScreenshotFile[]> {
+  if (!/^\d+$/.test(appid)) return []
+  const userdata = join(steamPath, 'userdata')
+  const users = await fs.readdir(userdata).catch(() => [] as string[])
+  const found: ScreenshotFile[] = []
+  for (const user of users) {
+    if (!/^\d+$/.test(user)) continue
+    const dir = join(userdata, user, '760', 'remote', appid, 'screenshots')
+    const names = await fs.readdir(dir).catch(() => [] as string[])
+    const thumbs = new Set((await fs.readdir(join(dir, 'thumbnails')).catch(() => [] as string[])).map((n) => n.toLowerCase()))
+    await Promise.all(
+      names
+        .filter((n) => /\.(jpe?g|png)$/i.test(n))
+        .map(async (name) => {
+          const path = join(dir, name)
+          const st = await fs.stat(path).catch(() => null)
+          if (!st?.isFile()) return
+          found.push({
+            path,
+            takenAt: st.mtimeMs,
+            ...(thumbs.has(name.toLowerCase()) ? { thumbnail: join(dir, 'thumbnails', name) } : {})
+          })
+        })
+    )
+  }
+  return found.sort((a, b) => b.takenAt - a.takenAt)
+}
+
+export async function scanSteam(env: SteamLocator = machine): Promise<ScannedGame[]> {
+  const steamPath = await findSteamPath(env)
   if (!steamPath) return []
+  if (env === machine) lastSteamPath = steamPath
 
   const [libraries, userStats] = await Promise.all([readLibraryPaths(steamPath), readUserStats(steamPath)])
   const byAppId = new Map<string, ScannedGame>()
@@ -297,6 +360,7 @@ export async function scanSteam(): Promise<ScannedGame[]> {
             sizeOnDisk: manifest.sizeOnDisk,
             playtimeMinutes: stats?.playtimeMinutes ?? null,
             lastPlayed,
+            updateAvailable: hasPendingUpdate(manifest),
             coverSources
           })
         })

@@ -7,22 +7,27 @@ export const IPC = {
   refreshLibrary: 'library:refresh',
   setFavorite: 'game:set-favorite',
   setHidden: 'game:set-hidden',
+  setCollections: 'game:set-collections',
   launchGame: 'game:launch',
   getTrailer: 'game:get-trailer',
   showContextMenu: 'game:show-context-menu',
+  getGameDetails: 'game:get-details',
+  openScreenshot: 'game:open-screenshot',
   updateSettings: 'settings:update',
   setHotkey: 'hotkey:set',
   suspendHotkey: 'hotkey:suspend',
   hideWindow: 'window:hide',
   getMediaCacheInfo: 'media:get-cache-info',
   clearTrailerCache: 'media:clear-trailers',
+  exportLibrary: 'library:export',
 
   // events
-  libraryUpdated: 'library:updated',
+  libraryPatch: 'library:patch',
   scanStatus: 'library:scan-status',
   settingsChanged: 'settings:changed',
   hotkeyStatus: 'hotkey:status',
   windowVisibility: 'window:visibility',
   contextAction: 'game:context-action',
-  openSettings: 'app:open-settings'
+  openSettings: 'app:open-settings',
+  notice: 'app:notice'
 } as const

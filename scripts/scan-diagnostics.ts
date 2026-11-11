@@ -6,7 +6,13 @@ import { scanXbox } from '../src/main/providers/xboxScan'
 
 for (const [label, scan] of [['Steam', scanSteam], ['Epic', scanEpic], ['Xbox', scanXbox]] as const) {
   const started = Date.now()
-  const games = await scan()
+  let games: Awaited<ReturnType<typeof scan>>
+  try {
+    games = await scan()
+  } catch (err) {
+    console.log(`\n== ${label}: could not be read: ${err instanceof Error ? err.message : String(err)}`)
+    continue
+  }
   console.log(`\n== ${label}: ${games.length} game(s) in ${Date.now() - started} ms`)
   for (const g of games) {
     console.log(`- ${g.name} [${g.platformId}]`)

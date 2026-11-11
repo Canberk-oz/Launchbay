@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PLATFORM_LABELS, PLATFORMS, type MediaCacheInfo, type Settings } from '@shared/types'
-import { closeSettings, refreshLibrary, unhideGame, updateSettings } from '../actions'
+import { closeSettings, exportLibrary, openDiskUsage, pushToast, refreshLibrary, unhideGame, updateSettings } from '../actions'
 import { formatBytes, formatRelative, plural } from '../lib/format'
 import { useStore } from '../store'
 import { HotkeyRecorder } from './HotkeyRecorder'
-import { CloseIcon, PlatformMark, RefreshIcon } from './Icons'
+import { PlatformMark, RefreshIcon } from './Icons'
+import { Sheet, SheetBlock as Block } from './Sheet'
 
 const api = window.launchbay
 
@@ -41,18 +42,6 @@ function Toggle({
   )
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }): React.JSX.Element {
-  return (
-    <section className="spec-block">
-      <div className="spec-block__head">
-        <h3 className="spec">{title}</h3>
-        <span className="spec-block__rule" aria-hidden="true" />
-      </div>
-      {children}
-    </section>
-  )
-}
-
 function SettingsBody(): React.JSX.Element {
   const settings = useStore((s) => s.settings)
   const games = useStore((s) => s.games)
@@ -62,8 +51,24 @@ function SettingsBody(): React.JSX.Element {
   const [cache, setCache] = useState<MediaCacheInfo | null>(null)
   const [clearing, setClearing] = useState(false)
 
+  // Measured when the sheet opens, then again once library changes settle
+  // (a cover sync sends many patches; each measurement stats every cached file).
+  const measured = useRef(false)
   useEffect(() => {
-    void api.getMediaCacheInfo().then(setCache)
+    let live = true
+    const measure = (): void =>
+      void api.getMediaCacheInfo().then(
+        (info) => {
+          measured.current = true
+          if (live) setCache(info)
+        },
+        () => undefined
+      )
+    const timer = setTimeout(measure, measured.current ? 1200 : 0)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
   }, [games])
 
   const counts = useMemo(() => {
@@ -114,7 +119,13 @@ function SettingsBody(): React.JSX.Element {
                 <PlatformMark platform={p} size={13} />
                 {PLATFORM_LABELS[p]}
               </dt>
-              <dd className={counts[p] ? undefined : 'is-muted'}>{counts[p] ? plural(counts[p], 'game') : 'Not found'}</dd>
+              {scan.failed.includes(p) ? (
+                <dd className="is-warning" title="The last scan couldn’t read this store. The reason is in launchbay.log.">
+                  Couldn’t be read{counts[p] ? ` · ${plural(counts[p], 'game')} from last time` : ''}
+                </dd>
+              ) : (
+                <dd className={counts[p] ? undefined : 'is-muted'}>{counts[p] ? plural(counts[p], 'game') : 'Not found'}</dd>
+              )}
             </div>
           ))}
         </dl>
@@ -124,6 +135,23 @@ function SettingsBody(): React.JSX.Element {
             <RefreshIcon size={15} className={scan.scanning ? 'is-spinning' : undefined} />
             {scan.scanning ? 'Scanning…' : 'Refresh library'}
           </button>
+        </div>
+        <div className="spec-block__foot">
+          <span className="muted">Where the disk space goes, by store and drive.</span>
+          <button className="btn" onClick={openDiskUsage}>
+            Disk usage
+          </button>
+        </div>
+        <div className="spec-block__foot">
+          <span className="muted">Export every game, hidden ones included.</span>
+          <span className="spec-block__actions">
+            <button className="btn" onClick={() => void exportLibrary('csv')}>
+              Export CSV
+            </button>
+            <button className="btn" onClick={() => void exportLibrary('json')}>
+              Export JSON
+            </button>
+          </span>
         </div>
         {hidden.length > 0 && (
           <div className="hidden-list">
@@ -161,9 +189,14 @@ function SettingsBody(): React.JSX.Element {
             disabled={clearing || !cache?.trailerBytes}
             onClick={async () => {
               setClearing(true)
-              await api.clearTrailerCache()
-              setCache(await api.getMediaCacheInfo())
-              setClearing(false)
+              try {
+                await api.clearTrailerCache()
+                setCache(await api.getMediaCacheInfo())
+              } catch {
+                pushToast({ tone: 'error', title: 'Couldn’t clear the previews', message: 'Some files may be in use. Try again in a moment.' })
+              } finally {
+                setClearing(false)
+              }
             }}
           >
             Clear previews
@@ -176,59 +209,12 @@ function SettingsBody(): React.JSX.Element {
   )
 }
 
-/** A side sheet, so the library stays visible behind it. */
-export function SettingsPanel(): React.JSX.Element | null {
+/** Settings, in a side sheet so the library stays visible behind it. */
+export function SettingsPanel(): React.JSX.Element {
   const open = useStore((s) => s.settingsOpen)
-  const [mounted, setMounted] = useState(open)
-  const panel = useRef<HTMLElement>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    if (open) {
-      returnFocus.current = document.activeElement as HTMLElement | null
-      setMounted(true)
-      return
-    }
-    const t = setTimeout(() => setMounted(false), 220)
-    returnFocus.current?.focus?.()
-    return () => clearTimeout(t)
-  }, [open])
-
-  useEffect(() => {
-    if (open && mounted) panel.current?.querySelector<HTMLElement>('button, [href], input')?.focus()
-  }, [open, mounted])
-
-  if (!mounted) return null
-
   return (
-    <div className={`sheet-layer${open ? ' is-open' : ''}`}>
-      <div className="sheet-scrim" onClick={closeSettings} />
-      <aside
-        className="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        ref={panel}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            e.stopPropagation()
-            closeSettings()
-          }
-        }}
-      >
-        <header className="sheet__head">
-          <h2 id="settings-title" className="sheet__title">
-            Settings
-          </h2>
-          <button className="icon-btn" aria-label="Close settings" onClick={closeSettings}>
-            <CloseIcon size={18} />
-          </button>
-        </header>
-        <div className="sheet__body">
-          <SettingsBody />
-        </div>
-      </aside>
-    </div>
+    <Sheet open={open} title="Settings" onClose={closeSettings}>
+      <SettingsBody />
+    </Sheet>
   )
 }

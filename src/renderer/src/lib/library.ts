@@ -1,11 +1,55 @@
-import { PLATFORM_LABELS, type Game, type Platform, type SortMode } from '@shared/types'
+import { sameCollection } from '@shared/collections'
+import { PLATFORM_LABELS, type Game, type LibraryPatch, type Platform, type SortMode } from '@shared/types'
 
 export type PlatformFilter = 'all' | Platform
+/** A filter pill: everything, one store, or one of the user's collections. */
+export type LibraryFilter = PlatformFilter | `collection:${string}`
+
+export function collectionFilter(name: string): LibraryFilter {
+  return `collection:${name}`
+}
+
+/** The collection a filter selects, or null for a store filter. */
+export function filterCollection(filter: LibraryFilter): string | null {
+  return filter.startsWith('collection:') ? filter.slice('collection:'.length) : null
+}
+
+export function matchesFilter(game: Game, filter: LibraryFilter): boolean {
+  if (filter === 'all') return true
+  const collection = filterCollection(filter)
+  if (collection !== null) return game.tags.some((t) => sameCollection(t, collection))
+  return game.platform === filter
+}
+
+/** The section title for a filter: "All games", "Steam games", or the collection's name. */
+export function filterTitle(filter: LibraryFilter): string {
+  if (filter === 'all') return 'All games'
+  return filterCollection(filter) ?? `${PLATFORM_LABELS[filter as Platform]} games`
+}
 
 export interface Section {
   key: 'favorites' | 'library'
   title: string
   games: Game[]
+}
+
+/**
+ * Applies a patch from the main process. Games it doesn't mention keep their
+ * object identity, so memoized tiles for them don't re-render.
+ */
+export function applyLibraryPatch(games: Game[], patch: Pick<LibraryPatch, 'upsert' | 'remove'>): Game[] {
+  if (patch.upsert.length === 0 && patch.remove.length === 0) return games
+  const updates = new Map(patch.upsert.map((g) => [g.id, g]))
+  const removed = new Set(patch.remove)
+  const next: Game[] = []
+  for (const game of games) {
+    if (removed.has(game.id)) continue
+    const update = updates.get(game.id)
+    next.push(update ?? game)
+    updates.delete(game.id)
+  }
+  for (const game of updates.values()) next.push(game)
+  return next
 }
 
 /** Case-, accent- and dotless-i-insensitive search key. */
@@ -26,6 +70,9 @@ export function compareGames(a: Game, b: Game, mode: SortMode): number {
   } else if (mode === 'size') {
     const d = (b.sizeOnDisk ?? -1) - (a.sizeOnDisk ?? -1)
     if (d !== 0) return d
+  } else if (mode === 'added') {
+    const d = (b.addedAt ?? 0) - (a.addedAt ?? 0)
+    if (d !== 0) return d
   }
   return collator.compare(a.name, b.name) || a.platform.localeCompare(b.platform)
 }
@@ -41,14 +88,14 @@ export function platformCounts(games: Game[]): Record<PlatformFilter, number> {
 }
 
 /**
- * Favorites are pinned above the full library (both respect the platform
- * filter). While searching there is a single results section instead, so a
- * match never appears twice.
+ * Favorites are pinned above the full library (both respect the filter).
+ * While searching there is a single results section instead, so a match
+ * never appears twice.
  */
-export function buildSections(games: Game[], opts: { search: string; platform: PlatformFilter; sort: SortMode }): Section[] {
+export function buildSections(games: Game[], opts: { search: string; filter: LibraryFilter; sort: SortMode }): Section[] {
   const query = searchKey(opts.search.trim())
   const visible = games.filter(
-    (g) => !g.isHidden && (opts.platform === 'all' || g.platform === opts.platform) && (!query || searchKey(g.name).includes(query))
+    (g) => !g.isHidden && matchesFilter(g, opts.filter) && (!query || searchKey(g.name).includes(query))
   )
   const sorted = [...visible].sort((a, b) => compareGames(a, b, opts.sort))
   if (query) return sorted.length ? [{ key: 'library', title: 'Results', games: sorted }] : []
@@ -56,7 +103,7 @@ export function buildSections(games: Game[], opts: { search: string; platform: P
   const favorites = visible
     .filter((g) => g.isFavorite)
     .sort((a, b) => (b.favoritedAt ?? 0) - (a.favoritedAt ?? 0) || collator.compare(a.name, b.name))
-  const title = opts.platform === 'all' ? 'All games' : `${PLATFORM_LABELS[opts.platform]} games`
+  const title = filterTitle(opts.filter)
   const sections: Section[] = []
   if (favorites.length) sections.push({ key: 'favorites', title: 'Favorites', games: favorites })
   if (sorted.length) sections.push({ key: 'library', title, games: sorted })

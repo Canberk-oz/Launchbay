@@ -1,14 +1,17 @@
-import { app, BrowserWindow, globalShortcut, Menu, protocol } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, powerMonitor, protocol, session } from 'electron'
 import { join } from 'node:path'
 import { acceleratorKeys } from '@shared/accelerator'
 import { IPC } from '@shared/ipc'
 import type { Settings } from '@shared/types'
+import { GameActions } from './gameActions'
 import { HotkeyManager } from './hotkey'
 import { registerIpc } from './ipc'
 import { LaunchService } from './launch'
+import { ProcessWatcher } from './processWatch'
 import { LibraryService } from './library/library'
 import { MEDIA_SCHEME, MediaService } from './library/media'
 import { providerFor } from './providers'
+import { recentGames, sameRecent, type RecentEntry } from './recent'
 import { SettingsStore } from './settings'
 import { createTray, type AppTray } from './tray'
 import { throttle } from './util/concurrency'
@@ -16,6 +19,11 @@ import { createLogger, initLogFile } from './util/log'
 import { WindowManager } from './window'
 
 const log = createLogger('app')
+
+// A stray error in a background job (a scan, a download) is logged, not shown
+// as Electron's raw error dialog; the app keeps running in the tray.
+process.on('uncaughtException', (err) => log.error('uncaught exception', err))
+process.on('unhandledRejection', (reason) => log.error('unhandled promise rejection', reason))
 
 // Cached covers and trailers are served from disk over glmedia://. `stream`
 // lets <video> make range requests against it.
@@ -63,6 +71,14 @@ async function main(): Promise<void> {
   await app.whenReady()
   // No menu bar, and none of its default accelerators (Ctrl+R reload, Ctrl+W close, zoom).
   Menu.setApplicationMenu(null)
+  // The UI needs no web permissions (camera, location, notifications, ...) and embeds nothing.
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  session.defaultSession.setPermissionCheckHandler(() => false)
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-attach-webview', (event) => event.preventDefault())
+  })
+  // The app is always dark, so native menus and dialogs are too, whatever the OS setting.
+  nativeTheme.themeSource = 'dark'
   const root = app.getPath('userData')
   initLogFile(join(root, 'launchbay.log'))
   log.info(`Launchbay ${app.getVersion()} starting (Electron ${process.versions.electron})`)
@@ -77,7 +93,21 @@ async function main(): Promise<void> {
   const library = new LibraryService(root, media)
   await library.init()
 
-  const launcher = new LaunchService(library)
+  // Running games: polled only while the window is visible, a launch is being
+  // confirmed, or a game it saw start is still running (see processWatch.ts).
+  const watcher = new ProcessWatcher(() => library.watchTargets())
+  watcher.on('running', (ids: ReadonlySet<string>) => library.setRunning(ids))
+  // A game left running while the PC sleeps isn't being played: leave the sleep out of its session.
+  let suspendedAt: number | null = null
+  powerMonitor.on('suspend', () => {
+    suspendedAt = Date.now()
+  })
+  powerMonitor.on('resume', () => {
+    if (suspendedAt !== null) library.skipSessionTime(Date.now() - suspendedAt)
+    suspendedAt = null
+  })
+  const launcher = new LaunchService(library, watcher)
+  const actions = new GameActions(library, launcher, media)
   const windows = new WindowManager(root, {
     closeToTray: () => settings.get().closeToTray,
     isQuitting: () => quitting,
@@ -92,16 +122,25 @@ async function main(): Promise<void> {
     () => media.flush(),
     () => windows.flush()
   )
-  disposers.push(() => launcher.dispose())
+  // The watcher first: its final empty running set closes open play sessions.
+  disposers.push(() => watcher.dispose(), () => launcher.dispose(), () => library.dispose())
 
   const send = (channel: string, payload?: unknown): void => {
     const win = windows.win
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
   }
 
-  registerIpc({ library, media, settings, hotkeys, launcher, windows, isPackaged: app.isPackaged, startHidden })
+  actions.on('notice', (notice) => send(IPC.notice, notice))
 
-  library.on('changed', throttle(() => send(IPC.libraryUpdated, library.list()), 150))
+  registerIpc({ library, media, settings, hotkeys, actions, windows, isPackaged: app.isPackaged, startHidden })
+
+  library.on(
+    'changed',
+    throttle(() => {
+      const patch = library.drainChanges()
+      if (patch) send(IPC.libraryPatch, patch)
+    }, 150)
+  )
   library.on('scan-status', (status) => send(IPC.scanStatus, status))
   settings.on('changed', (next: Settings, prev: Settings) => {
     send(IPC.settingsChanged, next)
@@ -120,7 +159,25 @@ async function main(): Promise<void> {
   applyLoginItem(initial.launchAtLogin)
 
   if (quitting) return // quit requested while starting up
-  await windows.create({ show: !startHidden })
+  const win = await windows.create({ show: !startHidden })
+
+  // Watch for running games while the window is on screen.
+  const syncVisible = (): void => {
+    if (!win.isDestroyed() && win.isVisible() && !win.isMinimized()) watcher.demand('visible', 'visible')
+    else watcher.release('visible')
+  }
+  win.on('show', syncVisible)
+  win.on('hide', syncVisible)
+  win.on('minimize', syncVisible)
+  win.on('restore', syncVisible)
+  syncVisible()
+  // Back from a store's uninstaller: check whether the game is gone.
+  win.on('focus', () => actions.onFocus())
+
+  // A game that started after the launch screen gave up still hides Launchbay, if that's the setting.
+  launcher.on('late-start', () => {
+    if (settings.get().hideAfterLaunch) void windows.hide()
+  })
 
   tray = createTray({
     show: () => windows.showNormal(),
@@ -129,8 +186,25 @@ async function main(): Promise<void> {
       windows.showNormal()
       send(IPC.openSettings)
     },
-    quit: () => app.quit()
+    quit: () => app.quit(),
+    // Straight from the tray, without the window. A failed hand-off brings the window up to say so.
+    launch: (id) =>
+      void actions.launch(id).then((result) => {
+        if (result.ok) return
+        windows.showNormal()
+        send(IPC.notice, { tone: 'error', title: `Couldn’t launch ${library.get(id)?.name ?? 'the game'}`, message: result.error })
+      })
   })
+  // The tray menu leads with the games played last; kept current as the library changes.
+  let recent: RecentEntry[] = []
+  const syncRecent = (): void => {
+    const next = recentGames(library.list())
+    if (sameRecent(next, recent)) return
+    recent = next
+    tray?.setRecent(next)
+  }
+  library.on('changed', throttle(syncRecent, 2000))
+  syncRecent()
   const status = hotkeys.getStatus()
   tray.setHotkeyHint(status.registered ? acceleratorKeys(status.accelerator).join('+') : null)
 

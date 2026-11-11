@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { PLATFORM_LABELS, type Game, type SortMode } from '@shared/types'
 import { launchGame, toggleFavorite, updateSettings } from '../actions'
-import { formatBytes, formatPlaytime, formatRelative } from '../lib/format'
+import { formatRelative, formatWhen, playtimeInfo, sizeText } from '../lib/format'
 import type { Section } from '../lib/library'
 import { useStore } from '../store'
 import { Cover } from './Cover'
@@ -17,6 +17,23 @@ const BOTTOM = 40
 
 type Row = { kind: 'head'; key: string; section: Section } | { kind: 'game'; key: string; game: Game }
 
+/** The store's playtime as a plain number; Launchbay's own measurement with its source underneath. */
+function PlaytimeCell({ game }: { game: Game }): React.JSX.Element {
+  const info = playtimeInfo(game)
+  if (!info) return <div className="row__num" role="cell">—</div>
+  if (!info.trackedByLaunchbay) return <div className="row__num" role="cell">{info.value}</div>
+  return (
+    <div
+      className="row__num row__num--tracked"
+      role="cell"
+      title={`Tracked by Launchbay from the sessions it saw. ${PLATFORM_LABELS[game.platform]} doesn't record playtime.`}
+    >
+      <span>{info.value}</span>
+      <span className="row__source">tracked by Launchbay</span>
+    </div>
+  )
+}
+
 const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: string }): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const launch = (): void => void launchGame(game, host.current)
@@ -26,7 +43,7 @@ const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: str
       role="row"
       tabIndex={0}
       data-game-id={game.id}
-      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}`}
+      aria-label={`${game.name}, ${PLATFORM_LABELS[game.platform]}${game.updateAvailable ? ', update ready' : ''}`}
       onClick={launch}
       onKeyDown={(e) => handleGameKeys(e, game, launch)}
       onContextMenu={(e) => {
@@ -39,20 +56,27 @@ const GameRow = memo(function GameRow({ game, error }: { game: Game; error?: str
       </div>
       <div className="row__name" role="cell">
         <span className="row__title">{game.name}</span>
+        {game.isRunning && <span className="row__tag row__tag--running spec">Running</span>}
+        {game.updateAvailable && (
+          <span className="row__tag spec" title="An update is waiting in Steam">
+            Update
+          </span>
+        )}
         {error && <span className="row__error spec">Couldn’t launch</span>}
       </div>
       <div className="row__platform" role="cell">
         <PlatformMark platform={game.platform} size={13} />
         <span>{PLATFORM_LABELS[game.platform]}</span>
       </div>
-      <div className="row__num" role="cell">
-        {formatPlaytime(game.playtimeMinutes)}
-      </div>
-      <div className="row__num" role="cell">
-        {formatBytes(game.sizeOnDisk)}
+      <PlaytimeCell game={game} />
+      <div className="row__num" role="cell" title={game.sizeStatus === 'known' ? undefined : sizeText(game, 'long')}>
+        {sizeText(game)}
       </div>
       <div className="row__num row__when" role="cell">
         {formatRelative(game.lastPlayed)}
+      </div>
+      <div className="row__num row__added" role="cell">
+        {formatWhen(game.addedAt)}
       </div>
       <div role="cell" className="row__fav">
         <button
@@ -92,6 +116,7 @@ function HeaderCell({ label, sort, align }: { label: string; sort?: SortMode; al
 export function VirtualList({ sections, resetKey }: { sections: Section[]; resetKey: string }): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const tileErrors = useStore((s) => s.tileErrors)
+  const sortMode = useStore((s) => s.settings.sortMode)
   const rows = useMemo(() => {
     const out: Row[] = []
     for (const section of sections) {
@@ -114,7 +139,12 @@ export function VirtualList({ sections, resetKey }: { sections: Section[]; reset
   }, [resetKey])
 
   return (
-    <div className="library-scroll library-scroll--list" ref={scrollRef} role="table" aria-label="Games">
+    <div
+      className={`library-scroll library-scroll--list${sortMode === 'added' ? ' is-sorted-by-added' : ''}`}
+      ref={scrollRef}
+      role="table"
+      aria-label="Games"
+    >
       <div className="list-head" role="row">
         <div role="columnheader" aria-label="Cover" />
         <HeaderCell label="Name" sort="name" />
@@ -122,6 +152,7 @@ export function VirtualList({ sections, resetKey }: { sections: Section[]; reset
         <HeaderCell label="Playtime" align="end" />
         <HeaderCell label="Size" sort="size" align="end" />
         <HeaderCell label="Last played" sort="recent" align="end" />
+        <HeaderCell label="Added" sort="added" align="end" />
         <div role="columnheader" aria-label="Favorite" />
       </div>
       <div className="list-canvas" style={{ height: virtualizer.getTotalSize() + BOTTOM }}>

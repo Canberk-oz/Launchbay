@@ -1,5 +1,5 @@
 import { acceleratorKeys } from '@shared/accelerator'
-import type { Game, Settings } from '@shared/types'
+import { PLATFORM_LABELS, type Game, type Settings } from '@shared/types'
 import { useStore, type LaunchState, type Rect, type Toast } from './store'
 
 const api = window.launchbay
@@ -9,16 +9,46 @@ const set = useStore.setState
 // ------------------------------------------------------------------ toasts
 
 let toastSeq = 0
+/** The exit animation's length; see .toast.is-leaving. */
+const TOAST_OUT_MS = 170
+// Auto-dismiss clocks, by toast id. Hovering or focusing a toast pauses its clock.
+const toastClocks = new Map<number, { timer: ReturnType<typeof setTimeout> | null; remainingMs: number; startedAt: number }>()
 
-export function pushToast(toast: Omit<Toast, 'id'>, ttlMs = 5200): number {
+export function pushToast(toast: Omit<Toast, 'id' | 'leaving'>, ttlMs = 5200): number {
   const id = ++toastSeq
   set((s) => ({ toasts: [...s.toasts.slice(-2), { ...toast, id }] }))
-  if (ttlMs > 0) setTimeout(() => dismissToast(id), ttlMs)
+  if (ttlMs > 0) {
+    toastClocks.set(id, { timer: null, remainingMs: ttlMs, startedAt: 0 })
+    resumeToast(id)
+  }
   return id
 }
 
+/** Stops a toast's countdown while the pointer or keyboard focus is on it. */
+export function pauseToast(id: number): void {
+  const clock = toastClocks.get(id)
+  if (!clock?.timer) return
+  clearTimeout(clock.timer)
+  clock.timer = null
+  // Always leave enough time to finish reading (or reach the button) after moving away.
+  clock.remainingMs = Math.max(1500, clock.remainingMs - (Date.now() - clock.startedAt))
+}
+
+export function resumeToast(id: number): void {
+  const clock = toastClocks.get(id)
+  if (!clock || clock.timer) return
+  clock.startedAt = Date.now()
+  clock.timer = setTimeout(() => dismissToast(id), clock.remainingMs)
+}
+
 export function dismissToast(id: number): void {
-  set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
+  const clock = toastClocks.get(id)
+  if (clock?.timer) clearTimeout(clock.timer)
+  toastClocks.delete(id)
+  const toast = get().toasts.find((t) => t.id === id)
+  if (!toast || toast.leaving) return
+  set((s) => ({ toasts: s.toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)) }))
+  setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), TOAST_OUT_MS)
 }
 
 // --------------------------------------------------------------- settings
@@ -48,6 +78,11 @@ export function updateSettings(patch: Partial<Settings>, immediate = false): voi
 
 // ------------------------------------------------------------------ games
 
+/** "Steam", "Steam and Xbox", "Steam, Epic and Xbox". */
+function listOf(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
 export function toggleFavorite(game: Game): void {
   const favorite = !game.isFavorite
   set((s) => ({
@@ -56,6 +91,12 @@ export function toggleFavorite(game: Game): void {
     )
   }))
   void api.setFavorite(game.id, favorite)
+}
+
+/** Replaces a game's collections, shown at once and confirmed by the next library patch. */
+export function setCollections(game: Game, names: string[]): void {
+  set((s) => ({ games: s.games.map((g) => (g.id === game.id ? { ...g, tags: names } : g)) }))
+  void api.setCollections(game.id, names)
 }
 
 export function unhideGame(id: string): void {
@@ -67,16 +108,58 @@ export async function refreshLibrary(): Promise<void> {
   if (get().scan.scanning) return
   set((s) => ({ scan: { ...s.scan, scanning: true } }))
   try {
-    await api.refreshLibrary()
-    const count = get().games.filter((g) => !g.isHidden).length
-    pushToast({ tone: 'info', title: 'Library refreshed', message: `${count} ${count === 1 ? 'game' : 'games'} on this PC.` }, 3200)
+    const { games, failed } = await api.refreshLibrary()
+    const found = `${games} ${games === 1 ? 'game' : 'games'} on this PC`
+    if (failed.length === 0) {
+      pushToast({ tone: 'info', title: 'Library refreshed', message: `${found}.` }, 3200)
+    } else {
+      // A store that couldn't be read keeps its last known games; say so instead of "refreshed".
+      pushToast(
+        {
+          tone: 'warning',
+          title: `Couldn’t read ${listOf(failed.map((p) => PLATFORM_LABELS[p]))}`,
+          message: `Showing the games found there last time. ${found}. The reason is in launchbay.log.`
+        },
+        9000
+      )
+    }
   } catch {
+    // The scan never started (or its reply was lost), so no scan-status event will clear this.
+    set((s) => ({ scan: { ...s.scan, scanning: false } }))
     pushToast({ tone: 'error', title: 'Refresh failed', message: 'The library could not be rescanned. Try again.' })
   }
 }
 
+export async function exportLibrary(format: 'json' | 'csv'): Promise<void> {
+  const result = await api.exportLibrary(format).catch((err: unknown) => ({ saved: false as const, error: String(err) }))
+  if (result.saved) {
+    pushToast({ tone: 'info', title: `Exported ${result.count === 1 ? '1 game' : `${result.count} games`}`, message: result.path }, 4200)
+  } else if (result.error) {
+    pushToast({ tone: 'error', title: 'Export failed', message: result.error }, 8000)
+  }
+}
+
+// One sheet at a time: opening one closes the others.
+const NO_SHEET = { settingsOpen: false, propertiesId: null, propertiesFocus: null, diskUsageOpen: false }
+
 export function openSettings(): void {
-  set({ settingsOpen: true })
+  set({ ...NO_SHEET, settingsOpen: true })
+}
+
+export function openProperties(id: string, focus: 'collections' | null = null): void {
+  set({ ...NO_SHEET, propertiesId: id, propertiesFocus: focus })
+}
+
+export function openDiskUsage(): void {
+  set({ ...NO_SHEET, diskUsageOpen: true })
+}
+
+export function closeDiskUsage(): void {
+  set({ diskUsageOpen: false })
+}
+
+export function closeProperties(): void {
+  set({ propertiesId: null })
 }
 
 export function closeSettings(): void {
@@ -89,7 +172,8 @@ export function focusSearch(): void {
 
 // ----------------------------------------------------------------- launch
 
-const EXPAND_MS = 520
+/** The cover's expansion into the launch scene (LaunchOverlay animates it). */
+export const LAUNCH_EXPAND_MS = 520
 const MIN_HOLD_MS = 1100
 const RESULT_HOLD_MS = 650
 const SAFETY_TIMEOUT_MS = 13_000
@@ -146,7 +230,7 @@ export async function launchGame(game: Game, originEl: Element | null): Promise<
   set({ launch: { token, game, origin: rectOf(originEl), phase: 'opening', status: 'starting' } })
   setTimeout(() => {
     if (get().launch?.phase === 'opening') patchLaunch(token, { phase: 'waiting' })
-  }, EXPAND_MS)
+  }, LAUNCH_EXPAND_MS)
 
   const result = await Promise.race([
     api
@@ -156,7 +240,7 @@ export async function launchGame(game: Game, originEl: Element | null): Promise<
   ])
 
   if (!result.ok) {
-    await sleep(Math.max(0, EXPAND_MS - (Date.now() - started)))
+    await sleep(Math.max(0, LAUNCH_EXPAND_MS - (Date.now() - started)))
     patchLaunch(token, { status: 'failed', phase: 'closing' })
     await sleep(LAUNCH_CLOSE_MS)
     patchLaunch(token, null)

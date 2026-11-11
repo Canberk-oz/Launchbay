@@ -1,21 +1,35 @@
+import { EventEmitter } from 'node:events'
 import type { LaunchResult } from '@shared/types'
 import type { LibraryService } from './library/library'
+import { LATE_START_WATCH_MS, LAUNCH_CONFIRM_TIMEOUT_MS } from './launchWatch'
+import type { ProcessWatcher } from './processWatch'
 import { providerFor } from './providers'
 import { sleep } from './util/concurrency'
 import { createLogger } from './util/log'
-import { LAUNCH_CONFIRM_TIMEOUT_MS, waitForGameStart } from './launchWatch'
 
 const log = createLogger('launch')
 
-export class LaunchService {
+/**
+ * Hands games to their launchers and confirms that they started. The launch
+ * screen waits LAUNCH_CONFIRM_TIMEOUT_MS; a game that is slower than that
+ * (a first Game Pass start, shader compilation) is watched for in the
+ * background for a few more minutes, and 'late-start' is emitted (with the
+ * game id) if it shows up, so it still gets its Running badge and the
+ * "hide once running" setting still applies.
+ */
+export class LaunchService extends EventEmitter {
   private readonly library: LibraryService
+  private readonly watcher: ProcessWatcher
   private readonly inFlight = new Map<string, Promise<LaunchResult>>()
+  private readonly late = new Map<string, AbortController>()
   /** LAUNCHBAY_DRY_RUN=1 simulates launches (=fail simulates a failure); for development. */
   private readonly dryRun = process.env.LAUNCHBAY_DRY_RUN ?? ''
   private readonly abort = new AbortController()
 
-  constructor(library: LibraryService) {
+  constructor(library: LibraryService, watcher: ProcessWatcher) {
+    super()
     this.library = library
+    this.watcher = watcher
   }
 
   launch(id: string): Promise<LaunchResult> {
@@ -29,6 +43,7 @@ export class LaunchService {
   /** Stops any launch watchers (app is quitting). */
   dispose(): void {
     this.abort.abort()
+    for (const c of this.late.values()) c.abort()
   }
 
   private async run(id: string): Promise<LaunchResult> {
@@ -54,10 +69,24 @@ export class LaunchService {
     }
     this.library.markPlayed(id)
 
-    const watch = provider.launchWatch?.(game)
-    if (!watch) return { ok: true, confirmed: false }
-    const confirmed = await waitForGameStart(watch, LAUNCH_CONFIRM_TIMEOUT_MS, this.abort.signal)
-    log.info(`${game.id}: ${confirmed ? 'running' : 'not detected before timeout'}`)
+    if (!provider.launchWatch) return { ok: true, confirmed: false }
+    this.late.get(id)?.abort() // a relaunch replaces an older background watch
+    const confirmed = await this.watcher.waitFor(id, LAUNCH_CONFIRM_TIMEOUT_MS, this.abort.signal)
+    log.info(`${game.id}: ${confirmed ? 'running' : 'not detected yet; watching in the background'}`)
+    if (!confirmed && !this.abort.signal.aborted) void this.watchLateStart(id)
     return { ok: true, confirmed }
+  }
+
+  private async watchLateStart(id: string): Promise<void> {
+    const controller = new AbortController()
+    this.late.set(id, controller)
+    const started = await this.watcher.waitFor(id, LATE_START_WATCH_MS, AbortSignal.any([controller.signal, this.abort.signal]), 'late')
+    if (this.late.get(id) === controller) this.late.delete(id)
+    if (!started) {
+      if (!controller.signal.aborted) log.info(`${id}: still not detected after the background watch`)
+      return
+    }
+    log.info(`${id}: started late`)
+    this.emit('late-start', id)
   }
 }

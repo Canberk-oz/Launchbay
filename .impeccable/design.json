@@ -19,7 +19,7 @@
       "title": { "displayName": "Title", "purpose": "Game names in list rows and tile captions." },
       "body": { "displayName": "Body", "purpose": "Controls, settings copy, notices; tabular lining figures." },
       "label": { "displayName": "Spec Label", "purpose": "Condensed caps for section heads, column heads, meta lines and spec-table keys." },
-      "box-type": { "displayName": "Box Type", "purpose": "Titles printed on box fronts (missing art, transparent logos)." },
+      "box-type": { "displayName": "Box Type", "purpose": "Titles printed on box fronts (missing art)." },
       "wordmark": { "displayName": "Wordmark", "purpose": "LAUNCHBAY in the title strip." }
     },
     "shadows": [
@@ -115,7 +115,7 @@
       "Near-black shelf, colorless chrome, one sticker-yellow accent.",
       "Archivo from a single variable family: condensed caps for every label, normal width for game names.",
       "Hairline-ruled spec headers with right-aligned counts divide the shelf.",
-      "Face-out 2:3 covers that lift on hover; transparent logos and missing art become printed box fronts.",
+      "Face-out 2:3 covers that lift on hover and always fill their tile; missing art becomes a printed box front.",
       "Drawn keycaps for every keyboard hint."
     ],
     "rules": [
