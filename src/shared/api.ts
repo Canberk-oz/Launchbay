@@ -26,7 +26,8 @@ export interface LaunchbayApi {
   setCollections(id: string, names: string[]): Promise<void>
   launchGame(id: string): Promise<LaunchResult>
   getTrailer(id: string): Promise<{ src: string } | null>
-  showContextMenu(id: string): Promise<void>
+  /** `at` (window coordinates) places the menu for keyboard invocations; the pointer position otherwise. */
+  showContextMenu(id: string, at?: { x: number; y: number }): Promise<void>
   getGameDetails(id: string): Promise<GameDetails | null>
   openScreenshot(url: string): Promise<void>
   updateSettings(patch: Partial<Settings>): Promise<Settings>

@@ -40,7 +40,9 @@ export function handleGameKeys(e: React.KeyboardEvent<HTMLElement>, game: Game, 
     toggleFavorite(game)
   } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
     e.preventDefault()
-    void window.launchbay.showContextMenu(game.id)
+    // From the keyboard the menu opens on the focused game, not wherever the pointer was left.
+    const r = e.currentTarget.getBoundingClientRect()
+    void window.launchbay.showContextMenu(game.id, { x: r.left + Math.min(r.width / 2, 72), y: r.top + Math.min(r.height / 2, 72) })
   }
 }
 

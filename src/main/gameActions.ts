@@ -260,7 +260,14 @@ export class GameActions extends EventEmitter {
           { label: 'New collection…', run: (g) => toRenderer('new-collection', g.id) }
         ]
       },
-      { label: 'Hide from library', icon: 'hide', run: (g) => this.setHidden(g.id, true) }
+      {
+        label: 'Hide from library',
+        icon: 'hide',
+        run: (g) => {
+          this.setHidden(g.id, true)
+          toRenderer('hidden', g.id) // the renderer offers an Undo
+        }
+      }
     )
     if (providerFor(game.platform).uninstallHandoff?.(game)) {
       entries.push({ label: 'Uninstall…', icon: 'uninstall', run: (g) => void this.uninstall(g.id, win) })
@@ -269,7 +276,8 @@ export class GameActions extends EventEmitter {
     return entries
   }
 
-  showMenu(id: string, win: BrowserWindow, toRenderer: (action: ContextAction, id: string) => void): void {
+  /** Pops the menu up at the pointer, or at `at` (window coordinates) when it was asked for from the keyboard. */
+  showMenu(id: string, win: BrowserWindow, toRenderer: (action: ContextAction, id: string) => void, at?: { x: number; y: number }): void {
     const game = this.library.get(id)
     if (!game) return
     const sub = (item: MenuCheck): MenuItemConstructorOptions =>
@@ -285,7 +293,7 @@ export class GameActions extends EventEmitter {
           ? { label: entry.label, icon: menuIcon(entry.icon), submenu: entry.submenu.map(sub) }
           : { label: entry.label, icon: menuIcon(entry.icon), click: () => entry.run(game) }
     )
-    Menu.buildFromTemplate(template).popup({ window: win })
+    Menu.buildFromTemplate(template).popup({ window: win, ...at })
   }
 
   private notify(notice: Notice): void {

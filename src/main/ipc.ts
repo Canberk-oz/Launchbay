@@ -80,10 +80,12 @@ export function registerIpc(deps: IpcDeps): void {
 
   ipcMain.handle(IPC.openScreenshot, (_e, url: unknown) => actions.openScreenshot(asString(url)))
 
-  ipcMain.handle(IPC.showContextMenu, (event: IpcMainInvokeEvent, id: unknown) => {
+  ipcMain.handle(IPC.showContextMenu, (event: IpcMainInvokeEvent, id: unknown, at: unknown) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
-    actions.showMenu(asString(id), win, (action, gameId) => event.sender.send(IPC.contextAction, { action, id: gameId }))
+    const p = at as { x?: unknown; y?: unknown } | null
+    const point = p && typeof p.x === 'number' && typeof p.y === 'number' && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(p.x), y: Math.round(p.y) } : undefined
+    actions.showMenu(asString(id), win, (action, gameId) => event.sender.send(IPC.contextAction, { action, id: gameId }), point)
   })
 
   ipcMain.handle(IPC.updateSettings, (_e, patch: unknown) => {

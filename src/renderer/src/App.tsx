@@ -9,6 +9,7 @@ import {
   pendingSettings,
   pushToast,
   refreshLibrary,
+  unhideGame,
   hotkeyLabel,
   updateSettings
 } from './actions'
@@ -35,8 +36,20 @@ function useMainProcessEvents(setAnim: (a: 'in' | 'out' | null) => void): void {
       api.onContextAction(({ action, id }) => {
         if (action === 'properties') return openProperties(id)
         if (action === 'new-collection') return openProperties(id, 'collections')
-        if (action !== 'launch') return
         const game = useStore.getState().games.find((g) => g.id === id)
+        if (action === 'hidden') {
+          // The tile just left the shelf: say where it went, and offer the way back.
+          pushToast(
+            {
+              tone: 'info',
+              title: `${game?.name ?? 'Game'} hidden`,
+              message: 'It stays installed. Hidden games are listed in Settings.',
+              action: { label: 'Undo', run: () => unhideGame(id) }
+            },
+            8000
+          )
+          return
+        }
         if (game) void launchGame(game, document.querySelector(`[data-game-id="${CSS.escape(id)}"] .cover-host`))
       }),
       api.onWindowVisibility((visibility) => {

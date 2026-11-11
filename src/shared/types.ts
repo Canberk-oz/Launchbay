@@ -192,8 +192,8 @@ export interface Notice {
   message?: string
 }
 
-/** Right-click menu picks the renderer carries out (they start UI there). */
-export type ContextAction = 'launch' | 'properties' | 'new-collection'
+/** Right-click menu picks the renderer carries out or follows up on (they start UI there). */
+export type ContextAction = 'launch' | 'properties' | 'new-collection' | 'hidden'
 
 /** Extra facts shown in a game's properties, fetched when the panel opens. */
 export interface GameDetails {
