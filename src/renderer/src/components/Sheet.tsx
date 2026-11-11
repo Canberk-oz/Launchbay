@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { CloseIcon } from './Icons'
 
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
 /**
  * A side sheet, so the library stays visible behind it (settings, game
  * properties). It stays mounted through its closing transition, takes focus
- * when it opens, returns focus when it closes, and closes on Esc or a click
- * on the scrim.
+ * when it opens and keeps it (Tab cycles inside the sheet), returns focus
+ * when it closes, and closes on Esc or a click on the scrim.
  */
 export function Sheet({
   open,
@@ -38,6 +40,41 @@ export function Sheet({
     if (open && mounted) panel.current?.querySelector<HTMLElement>('button, [href], input')?.focus()
   }, [open, mounted])
 
+  // The sheet is modal: Tab stays inside it, and Esc closes it wherever focus is.
+  const close = useRef(onClose)
+  close.current = onClose
+  useEffect(() => {
+    if (!open || !mounted) return
+    const onKey = (e: KeyboardEvent): void => {
+      const el = panel.current
+      if (!el) return
+      if (e.key === 'Escape') {
+        if (e.defaultPrevented) return
+        e.preventDefault()
+        close.current()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const items = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((n) => !n.hasAttribute('disabled') && n.getClientRects().length > 0)
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (!first) e.preventDefault()
+      else if (!el.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, mounted])
+
   if (!mounted) return null
 
   return (
@@ -49,13 +86,6 @@ export function Sheet({
         aria-modal="true"
         aria-labelledby={titleId}
         ref={panel}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            e.stopPropagation()
-            onClose()
-          }
-        }}
       >
         <header className="sheet__head">
           <h2 id={titleId} className="sheet__title">

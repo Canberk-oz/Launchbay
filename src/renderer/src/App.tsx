@@ -65,10 +65,13 @@ function useGlobalKeys(): void {
       const state = useStore.getState()
       if (state.launch) return
       const ctrl = e.ctrlKey || e.metaKey
+      // An open sheet is modal: search stays behind it until it closes.
+      const sheet = anySheetOpen(state)
       if (ctrl && e.key.toLowerCase() === 'f') {
         e.preventDefault()
-        focusSearch()
+        if (!sheet) focusSearch()
       } else if (e.key === '/' && !isTyping(e.target)) {
+        if (sheet) return
         e.preventDefault()
         focusSearch()
       } else if (ctrl && e.key === ',') {
