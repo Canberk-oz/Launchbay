@@ -7,10 +7,11 @@ import { join } from 'node:path'
 import { cleanCollections, collectionsOf } from '@shared/collections'
 import type { Game, LibraryPatch, Platform, ScanStatus, SizeStatus } from '@shared/types'
 import { providerFor, providers } from '../providers'
-import type { CoverSource, GameProvider, ScannedGame } from '../providers/types'
+import type { GameProvider, ScannedGame } from '../providers/types'
 import { JsonStore } from '../util/fsutil'
 import { createLogger } from '../util/log'
 import { addedAtFrom } from './addedAt'
+import { normalizeCache, normalizeUserData, type LibraryCache, type StoredGame, type UserData, type UserGameState } from './cacheFormat'
 import type { WatchTarget } from '../launchWatch'
 import { trackSessions } from './sessions'
 import type { MediaService } from './media'
@@ -24,49 +25,6 @@ export interface ScanRequest {
   manual: boolean
   /** Only these stores (after an uninstall hand-off); every store when omitted. */
   platforms?: readonly Platform[]
-}
-
-export interface StoredGame extends ScannedGame {
-  id: string
-  lastScanned: number
-}
-
-interface LibraryCache {
-  version: 1
-  lastScanAt: number | null
-  games: StoredGame[]
-}
-
-interface UserGameState {
-  favorite?: boolean
-  favoritedAt?: number
-  lastPlayed?: number
-  hidden?: boolean
-  /** Epoch ms the game arrived on this PC; cleared when a successful scan no longer finds it. */
-  addedAt?: number
-  /** Collections the game is in. Kept when the game is uninstalled, like favorites. */
-  tags?: string[]
-  /** Playtime Launchbay measured from sessions it saw (seconds), separate from any store figure. */
-  trackedSeconds?: number
-}
-
-interface UserData {
-  version: 1
-  games: Record<string, UserGameState>
-}
-
-function normalizeCache(raw: unknown): LibraryCache {
-  const r = raw as Partial<LibraryCache> | null
-  const games = Array.isArray(r?.games)
-    ? r.games.filter((g): g is StoredGame => !!g && typeof g.id === 'string' && typeof g.platform === 'string')
-    : []
-  for (const g of games) if (!Array.isArray(g.coverSources)) g.coverSources = [] as CoverSource[]
-  return { version: 1, lastScanAt: typeof r?.lastScanAt === 'number' ? r.lastScanAt : null, games }
-}
-
-function normalizeUserData(raw: unknown): UserData {
-  const r = raw as Partial<UserData> | null
-  return { version: 1, games: r?.games && typeof r.games === 'object' ? r.games : {} }
 }
 
 /** Whether a rescan found a game exactly as it was (ignoring when it was scanned). */
@@ -100,12 +58,12 @@ export class LibraryService extends EventEmitter {
   private readonly games = new Map<string, StoredGame>()
   private scanning: Promise<void> | null = null
   private queued: ScanRequest | null = null
-  // Changes not yet sent to the renderer; see drainChanges().
   // Running games (from the process watcher) and when each one's session began.
   private running: ReadonlySet<string> = new Set()
   private readonly sessionStarts = new Map<string, number>()
   private targetsCache: { version: number; targets: WatchTarget[] } | null = null
   private gamesVersion = 0
+  // Changes not yet sent to the renderer; see drainChanges().
   private readonly dirty = new Set<string>()
   private readonly removed = new Set<string>()
   private seq = 0
@@ -396,8 +354,7 @@ export class LibraryService extends EventEmitter {
       favoritedAt: user.favorite ? (user.favoritedAt ?? null) : null,
       lastPlayed,
       addedAt: user.addedAt ?? null,
-      tags: Array.isArray(user.tags) ? user.tags.filter((t): t is string => typeof t === 'string') : [],
-      // Caches written before this field existed have no value: unknown until the next scan.
+      tags: user.tags ?? [],
       updateAvailable: g.updateAvailable ?? null,
       isHidden: !!user.hidden
     }
