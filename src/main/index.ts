@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, powerMonitor, protocol } from 'electron'
+import { app, BrowserWindow, globalShortcut, Menu, nativeTheme, powerMonitor, protocol, session } from 'electron'
 import { join } from 'node:path'
 import { acceleratorKeys } from '@shared/accelerator'
 import { IPC } from '@shared/ipc'
@@ -70,6 +70,12 @@ async function main(): Promise<void> {
   await app.whenReady()
   // No menu bar, and none of its default accelerators (Ctrl+R reload, Ctrl+W close, zoom).
   Menu.setApplicationMenu(null)
+  // The UI needs no web permissions (camera, location, notifications, ...) and embeds nothing.
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  session.defaultSession.setPermissionCheckHandler(() => false)
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-attach-webview', (event) => event.preventDefault())
+  })
   // The app is always dark, so native menus and dialogs are too, whatever the OS setting.
   nativeTheme.themeSource = 'dark'
   const root = app.getPath('userData')

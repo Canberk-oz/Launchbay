@@ -1,5 +1,5 @@
 import { httpGet } from '../util/http'
-import { openProtocolUrl } from './launchers'
+import { openProtocolUrl, STALE_COMMAND } from './launchers'
 import { findScreenshots, pickTrailer, scanSteam, steamRoot, type SteamMovie } from './steamScan'
 import type { GameProvider } from './types'
 
@@ -10,6 +10,8 @@ export const steamProvider: GameProvider = {
   scan: scanSteam,
 
   async launch(game) {
+    // The command comes from the cached scan; only ever hand Steam a steam:// link.
+    if (!/^steam:\/\//i.test(game.launchCommand)) throw new Error(STALE_COMMAND)
     await openProtocolUrl(game.launchCommand, 'Steam')
   },
 

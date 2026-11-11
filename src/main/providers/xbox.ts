@@ -1,5 +1,5 @@
 import { isDirectory } from '../util/fsutil'
-import { openShellAppsFolder } from './launchers'
+import { openShellAppsFolder, STALE_COMMAND } from './launchers'
 import { scanXbox } from './xboxScan'
 import type { GameProvider } from './types'
 
@@ -13,6 +13,8 @@ export const xboxProvider: GameProvider = {
     if (!(await isDirectory(game.installPath))) {
       throw new Error('This game is no longer installed. Refresh the library to update it.')
     }
+    // Explorer opens whatever it is given; only ever give it a packaged app.
+    if (!/^shell:AppsFolder\\[^\s"\\/]+$/i.test(game.launchCommand)) throw new Error(STALE_COMMAND)
     await openShellAppsFolder(game.launchCommand)
   },
 

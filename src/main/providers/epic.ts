@@ -1,4 +1,4 @@
-import { openProtocolUrl } from './launchers'
+import { openProtocolUrl, STALE_COMMAND } from './launchers'
 import { epicStorePageUrl, scanEpic } from './epicScan'
 import type { GameProvider } from './types'
 
@@ -9,6 +9,7 @@ export const epicProvider: GameProvider = {
   scan: scanEpic,
 
   async launch(game) {
+    if (!/^com\.epicgames\.launcher:\/\//i.test(game.launchCommand)) throw new Error(STALE_COMMAND)
     await openProtocolUrl(game.launchCommand, 'The Epic Games Launcher')
   },
 

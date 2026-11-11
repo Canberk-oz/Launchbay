@@ -17,6 +17,7 @@ import type { LibraryService } from './library/library'
 import type { MediaService } from './library/media'
 import { providerFor } from './providers'
 import { openProtocolUrl } from './providers/launchers'
+import { isDirectory } from './util/fsutil'
 import { createLogger } from './util/log'
 import { resourcePath } from './window'
 
@@ -123,7 +124,8 @@ export class GameActions extends EventEmitter {
   async openInstallFolder(id: string): Promise<void> {
     const game = this.library.get(id)
     if (!game) return
-    const error = await shell.openPath(game.installPath)
+    // openPath runs a file it is given; an install "folder" must be a folder.
+    const error = (await isDirectory(game.installPath)) ? await shell.openPath(game.installPath) : 'not a folder (missing, or the drive is unplugged)'
     if (!error) return
     log.warn(`could not open ${game.installPath}: ${error}`)
     this.notify({ tone: 'error', title: 'Couldn’t open the install folder', message: game.installPath })

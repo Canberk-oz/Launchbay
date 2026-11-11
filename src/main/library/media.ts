@@ -57,6 +57,8 @@ const TRAILER_CACHE_LIMIT_BYTES = 768 * 1024 * 1024
 // Unreferenced files younger than this may belong to a write still in flight.
 const STRAY_FILE_GRACE_MS = 10 * 60_000
 const PROGRESSIVE_MAX_BYTES = 80 * 1024 * 1024
+// No store serves cover art anywhere near this; anything bigger isn't a cover.
+const COVER_MAX_BYTES = 24 * 1024 * 1024
 // Steam's store API allows roughly 200 requests per 5 minutes.
 const LOOKUP_SPACING_MS = 1600
 const RATE_LIMIT_BACKOFF_MS = 60_000
@@ -229,7 +231,7 @@ export class MediaService extends EventEmitter {
       if (source.kind === 'url') {
         i++
         try {
-          art = analyzeArtwork((await httpGetBuffer(source.url, { timeoutMs: 20_000 })).data)
+          art = analyzeArtwork((await httpGetBuffer(source.url, { timeoutMs: 20_000, maxBytes: COVER_MAX_BYTES })).data)
           origin = source.url
           if (!art) lastError = 'not an image'
         } catch (err) {
@@ -589,7 +591,12 @@ export class MediaService extends EventEmitter {
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const dir = url.hostname === 'covers' ? this.coversDir : url.hostname === 'trailers' ? this.trailersDir : null
-    const name = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
+    let name: string
+    try {
+      name = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
+    } catch {
+      return new Response('Bad request', { status: 400 }) // malformed escape
+    }
     const registered = url.hostname === 'files' ? this.files.get(name) : undefined
     if ((!dir && !registered) || !/^[\w.-]+$/.test(name) || name.includes('..')) {
       return new Response('Not found', { status: 404 })

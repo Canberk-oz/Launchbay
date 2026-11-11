@@ -1,6 +1,9 @@
 import { app, shell } from 'electron'
 import { spawn } from 'node:child_process'
 
+/** Shown when a cached launch command isn't one its store's scanner would have written. */
+export const STALE_COMMAND = 'This game’s launch command looks wrong. Refresh the library and try again.'
+
 /**
  * Opens a launcher URL such as steam://run/400. Checks for a registered
  * handler first, because Windows would otherwise show an "open with" prompt

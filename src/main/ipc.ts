@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain as electronIpc, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { ExportResult, InitialState, RefreshResult, Settings } from '@shared/types'
@@ -29,6 +29,21 @@ const asString = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 export function registerIpc(deps: IpcDeps): void {
   const { library, media, settings, hotkeys, actions, windows } = deps
+
+  // Only the app window's own page may call in: not a subframe, not any other web contents.
+  const trusted = (event: IpcMainInvokeEvent): boolean =>
+    event.sender === windows.win?.webContents && event.senderFrame !== null && event.senderFrame === event.sender.mainFrame
+  const ipcMain = {
+    handle<A extends unknown[], R>(channel: string, listener: (event: IpcMainInvokeEvent, ...args: A) => R): void {
+      electronIpc.handle(channel, (event, ...args) => {
+        if (!trusted(event)) {
+          log.warn(`rejected ${channel} from an unexpected sender`)
+          throw new Error('Not allowed')
+        }
+        return listener(event, ...(args as A))
+      })
+    }
+  }
 
   ipcMain.handle(IPC.getInitialState, (): InitialState => ({
     version: app.getVersion(),
